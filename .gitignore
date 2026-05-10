@@ -1,1 +1,37 @@
-node_modules
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment variables
+.env
+.env.*
+
+# ChromaDB data
+db/chroma_data/
+*.sqlite3
+*.bin
+*.chroma
+
+# Ollama / model files
+*.gguf
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Node
+node_modules/
