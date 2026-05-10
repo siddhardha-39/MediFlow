@@ -35,3 +35,7 @@ Thumbs.db
 
 # Node
 node_modules/
+
+# Runtime data (audio uploads, transcripts)
+uploads/
+transcripts/
