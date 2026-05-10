@@ -39,3 +39,4 @@ node_modules/
 # Runtime data (audio uploads, transcripts)
 uploads/
 transcripts/
+mediflow.db
