@@ -10,13 +10,14 @@ import logging
 from langchain_ollama import ChatOllama
 from langchain_core.messages import HumanMessage
 
+from config import MEDIFLOW_LLM_MODEL
 from soap_notes.prompts import SOAP_GENERATION_PROMPT
 from soap_notes.models import SOAPNote
 
 logger = logging.getLogger("soap_notes.generator")
 
 # Same model as Stage 2 — deterministic output
-llm = ChatOllama(model="llama3.2:1b", temperature=0.0)
+llm = ChatOllama(model=MEDIFLOW_LLM_MODEL, temperature=0.0)
 
 
 def generate_soap_raw(transcript_text: str) -> str:

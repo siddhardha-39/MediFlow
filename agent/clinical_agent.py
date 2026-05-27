@@ -31,6 +31,7 @@ import logging
 from langchain_ollama import ChatOllama
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from config import MEDIFLOW_LLM_MODEL
 from tools.clinical_tools import ALL_TOOLS
 from agent.prompts import SYSTEM_PROMPT
 from memory.session_memory import SessionContext
@@ -46,7 +47,7 @@ class ClinicalAgent:
     Maintains session memory across interactions.
     """
 
-    def __init__(self, model: str = "llama3.2:1b"):
+    def __init__(self, model: str = MEDIFLOW_LLM_MODEL):
         # Bind tools to the LLM so it knows what's available
         self.llm = ChatOllama(model=model, temperature=0.0)
         self.llm_with_tools = self.llm.bind_tools(ALL_TOOLS)

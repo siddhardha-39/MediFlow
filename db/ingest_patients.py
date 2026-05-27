@@ -1,16 +1,12 @@
-import sys
 from pathlib import Path
 
-# Add project root to sys.path so we can import from document_loading and db
-sys.path.append(str(Path(__file__).parent.parent))
+from rag.service import ingest_patient_documents
 
-from document_loading.pdf_loader import load_and_chunk_pdf
-from db.chroma_store import add_documents_to_db
 
-def ingest_all_patients():
+def ingest_all_patients(force_rebuild: bool = False):
     """
     Loops through all PDFs in data/sample_patients, extracts text, chunks it,
-    and stores the embeddings in separate ChromaDB folders per patient.
+    and stores the embeddings in the upgraded patient-specific RAG folders.
     """
     data_dir = Path(__file__).parent.parent / "data" / "sample_patients"
     
@@ -28,15 +24,11 @@ def ingest_all_patients():
     for pdf_path in pdf_files:
         patient_id = pdf_path.stem
         print(f"\nProcessing {patient_id}...")
-        
-        # 1. Loader & Chunker
-        chunks = load_and_chunk_pdf(pdf_path)
-        print(f"  - Generated {len(chunks)} chunks.")
-        
-        # 2. Embeddings & ChromaDB (Stored separately per patient ID)
-        print(f"  - Storing embeddings in ChromaDB...")
-        add_documents_to_db(chunks, patient_id=patient_id)
-        
+        ingest_patient_documents(
+            patient_id=patient_id,
+            docs_dir=data_dir,
+            force_rebuild=force_rebuild,
+        )
         print(f"  - Successfully ingested {patient_id}!")
 
 if __name__ == "__main__":

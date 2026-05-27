@@ -17,6 +17,8 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
 
+from config import MEDIFLOW_LLM_MODEL
+
 
 class SOAPNote(BaseModel):
     """
@@ -51,4 +53,4 @@ class SOAPResult(BaseModel):
     patient_info: Optional[dict] = Field(default=None, description="Extracted medical entities (from Stage 2)")
     transcript_text: str = Field(description="Original transcript used for generation")
     created_at: datetime = Field(default_factory=datetime.now)
-    model_used: str = Field(default="llama3.2:1b")
+    model_used: str = Field(default=MEDIFLOW_LLM_MODEL)

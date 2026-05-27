@@ -9,7 +9,8 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_ollama import ChatOllama
 from langchain_core.output_parsers import StrOutputParser
 
-from db.chroma_store import get_retriever
+from config import MEDIFLOW_LLM_MODEL
+from rag.service import generate_grounded_patient_briefing
 
 MEDICAL_SUMMARY_PROMPT = """You are a clinical assistant helping doctors prepare for patient consultations.
 
@@ -48,7 +49,7 @@ RELEVANT PATIENT RECORD EXTRACTS:
 def generate_patient_briefing(
     patient_record_context: str,
     *,
-    model_name: str = "llama3.2:1b",
+    model_name: str = MEDIFLOW_LLM_MODEL,
     temperature: float = 0.0,
 ) -> str:
     # LLM
@@ -66,22 +67,15 @@ def generate_patient_briefing(
 def summarize_patient(
     patient_id: str,
     *,
-    model_name: str = "llama3.2:1b",
+    model_name: str = MEDIFLOW_LLM_MODEL,
 ) -> str:
-    print(f"Retrieving relevant context from ChromaDB for patient: {patient_id}...")
-    
-    # Retriever (taking embeddings from separate Chroma folder)
-    retriever = get_retriever(patient_id=patient_id, k=5)
-    
-    # Retrieve top K relevant chunks using Embeddings
-    docs = retriever.invoke("What is the patient's name, age, medical history, medications, allergies, and recent visits?")
-    context = "\n\n".join(doc.page_content for doc in docs)
-    
-    print("Generating doctor briefing using LLM...")
-    # LLM & Doctor Summary
-    briefing = generate_patient_briefing(context, model_name=model_name)
-    
-    return briefing
+    """
+    Generate a grounded doctor briefing from the upgraded RAG pipeline.
+
+    The public return type remains a plain string so the existing FastAPI
+    response shape stays unchanged.
+    """
+    return generate_grounded_patient_briefing(patient_id, model_name=model_name)
 
 if __name__ == "__main__":
     # Test with the ID of our mock patient instead of the file path

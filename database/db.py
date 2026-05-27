@@ -12,6 +12,7 @@ import json
 import logging
 from pathlib import Path
 from typing import Optional, List, Dict, Any
+from contextlib import contextmanager
 
 logger = logging.getLogger("database.db")
 
@@ -27,42 +28,51 @@ def _get_connection() -> sqlite3.Connection:
     return conn
 
 
+@contextmanager
+def db_connection():
+    """Context manager to ensure database connections are always closed."""
+    conn = _get_connection()
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
 def init_db():
     """
     Create tables if they don't exist.
     Called once at app startup.
     Safe to call multiple times (IF NOT EXISTS).
     """
-    conn = _get_connection()
-    conn.executescript("""
-        CREATE TABLE IF NOT EXISTS patients (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            age INTEGER,
-            gender TEXT,
-            medical_record_number TEXT UNIQUE,
-            created_at TEXT DEFAULT (datetime('now', 'localtime'))
-        );
+    with db_connection() as conn:
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS patients (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                age INTEGER,
+                gender TEXT,
+                medical_record_number TEXT UNIQUE,
+                created_at TEXT DEFAULT (datetime('now', 'localtime'))
+            );
 
-        CREATE TABLE IF NOT EXISTS sessions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            patient_id INTEGER NOT NULL,
-            audio_file TEXT,
-            transcript TEXT,
-            soap_subjective TEXT,
-            soap_objective TEXT,
-            soap_assessment TEXT,
-            soap_plan TEXT,
-            conditions TEXT,
-            medications TEXT,
-            allergies TEXT,
-            symptoms TEXT,
-            created_at TEXT DEFAULT (datetime('now', 'localtime')),
-            FOREIGN KEY (patient_id) REFERENCES patients(id)
-        );
-    """)
-    conn.commit()
-    conn.close()
+            CREATE TABLE IF NOT EXISTS sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patient_id INTEGER NOT NULL,
+                audio_file TEXT,
+                transcript TEXT,
+                soap_subjective TEXT,
+                soap_objective TEXT,
+                soap_assessment TEXT,
+                soap_plan TEXT,
+                conditions TEXT,
+                medications TEXT,
+                allergies TEXT,
+                symptoms TEXT,
+                created_at TEXT DEFAULT (datetime('now', 'localtime')),
+                FOREIGN KEY (patient_id) REFERENCES patients(id)
+            );
+        """)
+        conn.commit()
     logger.info("Database initialized: %s", DB_PATH)
 
 
@@ -71,42 +81,38 @@ def init_db():
 def create_patient(name: str, age: int = None, gender: str = None,
                    mrn: str = None) -> int:
     """Create a patient and return their ID."""
-    conn = _get_connection()
-    cursor = conn.execute(
-        "INSERT INTO patients (name, age, gender, medical_record_number) VALUES (?, ?, ?, ?)",
-        (name, age, gender, mrn),
-    )
-    patient_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
+    with db_connection() as conn:
+        cursor = conn.execute(
+            "INSERT INTO patients (name, age, gender, medical_record_number) VALUES (?, ?, ?, ?)",
+            (name, age, gender, mrn),
+        )
+        patient_id = cursor.lastrowid
+        conn.commit()
     logger.info("Created patient: id=%d name=%s", patient_id, name)
     return patient_id
 
 
 def get_patient(patient_id: int) -> Optional[Dict[str, Any]]:
     """Get a patient by ID."""
-    conn = _get_connection()
-    row = conn.execute("SELECT * FROM patients WHERE id = ?", (patient_id,)).fetchone()
-    conn.close()
+    with db_connection() as conn:
+        row = conn.execute("SELECT * FROM patients WHERE id = ?", (patient_id,)).fetchone()
     return dict(row) if row else None
 
 
 def get_patient_by_name(name: str) -> Optional[Dict[str, Any]]:
     """Find a patient by name (case-insensitive partial match)."""
-    conn = _get_connection()
-    row = conn.execute(
-        "SELECT * FROM patients WHERE LOWER(name) LIKE LOWER(?)",
-        (f"%{name}%",),
-    ).fetchone()
-    conn.close()
+    with db_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM patients WHERE LOWER(name) LIKE LOWER(?)",
+            (f"%{name}%",),
+        ).fetchone()
     return dict(row) if row else None
 
 
 def list_patients() -> List[Dict[str, Any]]:
     """List all patients."""
-    conn = _get_connection()
-    rows = conn.execute("SELECT * FROM patients ORDER BY created_at DESC").fetchall()
-    conn.close()
+    with db_connection() as conn:
+        rows = conn.execute("SELECT * FROM patients ORDER BY created_at DESC").fetchall()
     return [dict(r) for r in rows]
 
 
@@ -128,40 +134,38 @@ def create_session(patient_id: int, audio_file: str = None,
     soap = soap_note or {}
     info = patient_info or {}
 
-    conn = _get_connection()
-    cursor = conn.execute(
-        """INSERT INTO sessions
-           (patient_id, audio_file, transcript,
-            soap_subjective, soap_objective, soap_assessment, soap_plan,
-            conditions, medications, allergies, symptoms)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (
-            patient_id, audio_file, transcript,
-            soap.get("subjective", ""),
-            soap.get("objective", ""),
-            soap.get("assessment", ""),
-            soap.get("plan", ""),
-            json.dumps(info.get("conditions", [])),
-            json.dumps(info.get("medications", [])),
-            json.dumps(info.get("allergies", [])),
-            json.dumps(info.get("symptoms", [])),
-        ),
-    )
-    session_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
+    with db_connection() as conn:
+        cursor = conn.execute(
+            """INSERT INTO sessions
+               (patient_id, audio_file, transcript,
+                soap_subjective, soap_objective, soap_assessment, soap_plan,
+                conditions, medications, allergies, symptoms)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                patient_id, audio_file, transcript,
+                soap.get("subjective", ""),
+                soap.get("objective", ""),
+                soap.get("assessment", ""),
+                soap.get("plan", ""),
+                json.dumps(info.get("conditions", [])),
+                json.dumps(info.get("medications", [])),
+                json.dumps(info.get("allergies", [])),
+                json.dumps(info.get("symptoms", [])),
+            ),
+        )
+        session_id = cursor.lastrowid
+        conn.commit()
     logger.info("Created session: id=%d patient_id=%d", session_id, patient_id)
     return session_id
 
 
 def get_patient_sessions(patient_id: int) -> List[Dict[str, Any]]:
     """Get all sessions for a patient, most recent first."""
-    conn = _get_connection()
-    rows = conn.execute(
-        "SELECT * FROM sessions WHERE patient_id = ? ORDER BY created_at DESC",
-        (patient_id,),
-    ).fetchall()
-    conn.close()
+    with db_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM sessions WHERE patient_id = ? ORDER BY created_at DESC",
+            (patient_id,),
+        ).fetchall()
     return [dict(r) for r in rows]
 
 

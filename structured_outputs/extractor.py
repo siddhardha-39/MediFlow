@@ -13,13 +13,14 @@ NOTE: This module intentionally does NOT parse or validate.
 from langchain_ollama import ChatOllama
 from langchain_core.messages import HumanMessage
 
+from config import MEDIFLOW_LLM_MODEL
 from structured_outputs.prompts import EXTRACTION_PROMPT, RETRY_PROMPT
 from structured_outputs.utils import get_logger, truncate
 
 logger = get_logger("extractor")
 
 # ── Model configuration ────────────────────────────────────────────────────────
-MODEL_NAME  = "llama3.2:1b"
+MODEL_NAME  = MEDIFLOW_LLM_MODEL
 TEMPERATURE = 0.0        # deterministic — essential for structured extraction
 
 llm = ChatOllama(model=MODEL_NAME, temperature=TEMPERATURE)

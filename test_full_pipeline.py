@@ -75,9 +75,19 @@ def main():
     print("[OK] Database initialized")
 
     # Create test patients
-    p1_id = create_patient("Rajesh Kumar", age=55, gender="Male", mrn="MRN-001")
-    p2_id = create_patient("Priya Sharma", age=32, gender="Female", mrn="MRN-002")
-    print(f"[OK] Created patients: Rajesh (ID={p1_id}), Priya (ID={p2_id})")
+    from database.db import get_patient_by_name
+    import sqlite3
+    try:
+        p1_id = create_patient("Rajesh Kumar", age=55, gender="Male", mrn="MRN-001")
+    except sqlite3.IntegrityError:
+        p1 = get_patient_by_name("Rajesh Kumar")
+        p1_id = p1["id"] if p1 else None
+    try:
+        p2_id = create_patient("Priya Sharma", age=32, gender="Female", mrn="MRN-002")
+    except sqlite3.IntegrityError:
+        p2 = get_patient_by_name("Priya Sharma")
+        p2_id = p2["id"] if p2 else None
+    print(f"[OK] Found/Created patients: Rajesh (ID={p1_id}), Priya (ID={p2_id})")
 
     patients = list_patients()
     print(f"[OK] Total patients in DB: {len(patients)}")
