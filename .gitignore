@@ -1,42 +1,50 @@
-# Python
+# ── Python ────────────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
 
-# Virtual environments
+# ── Virtual Environments ──────────────────────────────────────────────────────
 .venv/
 venv/
 env/
 
-# Environment variables
+# ── Testing and Coverage ──────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ── Environment and Secrets ───────────────────────────────────────────────────
 .env
 .env.*
+!.env.example
 
-# ChromaDB data
-db/chroma_data/
+# ── Local Databases ───────────────────────────────────────────────────────────
+mediflow.db
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
 *.sqlite3
+
+# ── Runtime Data and Uploads ──────────────────────────────────────────────────
+uploads/
+transcripts/
+
+# ── Vector Stores and Local Models ────────────────────────────────────────────
+db/chroma_data/
 *.bin
 *.chroma
-
-# Ollama / model files
 *.gguf
 
-# IDE
+# ── IDE and Editor Files ──────────────────────────────────────────────────────
 .vscode/
 .idea/
 
-# OS
+# ── Operating System Files ────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
 
-# Logs
+# ── Logs and Temporary Files ──────────────────────────────────────────────────
 *.log
-
-# Node
-node_modules/
-
-# Runtime data (audio uploads, transcripts)
-uploads/
-transcripts/
-mediflow.db
+tmp/

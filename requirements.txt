@@ -31,3 +31,7 @@ python-dotenv>=1.0.0
 streamlit>=1.35.0
 pandas>=2.0.0
 httpx>=0.25.0
+
+# ── Database Drivers ───────────────────────────────────────────────
+psycopg2-binary>=2.9.0
+

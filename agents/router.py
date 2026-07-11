@@ -20,7 +20,7 @@ from database.db import (
     get_patient_by_name,
     get_patient_sessions,
     get_patient_history,
-    _get_connection
+    get_db_stats
 )
 
 logger = logging.getLogger("agents.router")
@@ -133,51 +133,6 @@ async def get_history(patient_id: str):
 
 
 # ── Dashboard Helper & Endpoints ──────────────────────────────────────────────
-
-def get_db_stats() -> dict:
-    """Helper to aggregate operational metrics from the database."""
-    conn = _get_connection()
-    try:
-        total_patients = conn.execute("SELECT COUNT(*) FROM patients").fetchone()[0]
-        total_sessions = conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
-        
-        rows = conn.execute("SELECT conditions, medications, allergies FROM sessions").fetchall()
-        conditions_count = {}
-        medications_count = {}
-        allergies_count = {}
-        
-        for row in rows:
-            if row[0]:
-                try:
-                    for cond in json.loads(row[0]):
-                        conditions_count[cond] = conditions_count.get(cond, 0) + 1
-                except:
-                    pass
-            if row[1]:
-                try:
-                    for med in json.loads(row[1]):
-                        medications_count[med] = medications_count.get(med, 0) + 1
-                except:
-                    pass
-            if row[2]:
-                try:
-                    for alg in json.loads(row[2]):
-                        allergies_count[alg] = allergies_count.get(alg, 0) + 1
-                except:
-                    pass
-                
-        top_conditions = sorted(conditions_count.items(), key=lambda x: x[1], reverse=True)[:5]
-        top_medications = sorted(medications_count.items(), key=lambda x: x[1], reverse=True)[:5]
-        
-        return {
-            "total_patients": total_patients,
-            "total_sessions": total_sessions,
-            "top_conditions": [{"name": k, "count": v} for k, v in top_conditions],
-            "top_medications": [{"name": k, "count": v} for k, v in top_medications],
-            "allergies_summary": [{"name": k, "count": v} for k, v in allergies_count.items()],
-        }
-    finally:
-        conn.close()
 
 
 @dashboard_router.get("/stats")
