@@ -17,16 +17,15 @@ LANGGRAPH CONCEPT — CORRECTION WORKFLOW:
     We use retry_count to prevent infinite loops.
 """
 import logging
+from typing import Optional
 from langchain_core.messages import HumanMessage
+from langchain_core.runnables import RunnableConfig
 
-from config import MEDIFLOW_LLM_MODEL
 from llm_factory import get_chat_llm
 from clinical_workflow.state import ClinicalWorkflowState
 from clinical_workflow.utils import parse_llm_json
 
 logger = logging.getLogger("workflow.node.corrector")
-
-llm = get_chat_llm(temperature=0.0)
 
 MAX_CORRECTIONS = 3  # Safety limit to prevent infinite reject→correct loops
 
@@ -46,13 +45,16 @@ Return ONLY valid JSON with keys: subjective, objective, assessment, plan.
 Do not include any explanation outside the JSON."""
 
 
-def corrector_node(state: ClinicalWorkflowState) -> dict:
+def corrector_node(state: ClinicalWorkflowState, config: RunnableConfig = None) -> dict:
     """
     Re-generate SOAP note based on doctor feedback.
 
     Reads:  state["soap_*"], state["doctor_feedback"], state["retry_count"]
     Writes: state["soap_*"], state["doctor_approved"] (reset to None)
     """
+    api_key: Optional[str] = (config or {}).get("configurable", {}).get("api_key")
+    llm = get_chat_llm(temperature=0.0, api_key=api_key)
+
     feedback = state.get("doctor_feedback", "No specific feedback")
     retry_count = state.get("retry_count", 0)
     logger.info("CORRECTOR: Processing feedback (attempt %d) - %s", retry_count, feedback)

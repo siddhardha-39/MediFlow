@@ -48,9 +48,9 @@ def validator_node(state: ClinicalWorkflowState) -> dict:
         stripped = (content or "").strip()
         if not stripped:
             missing.append(name)
-        elif len(stripped) < MIN_SECTION_LENGTH:
+        elif len(stripped) <= MIN_SECTION_LENGTH:
             warnings.append(f"{name} is very short ({len(stripped)} chars)")
-        elif stripped.lower() in PLACEHOLDER_VALUES:
+        elif any(placeholder in stripped.lower() for placeholder in PLACEHOLDER_VALUES):
             warnings.append(f"{name} contains a placeholder value")
 
     is_valid = len(missing) == 0

@@ -20,12 +20,12 @@ Rules:
 - Keep each section concise but complete
 
 Required JSON format:
-{
+{{
     "subjective": "...",
     "objective": "...",
     "assessment": "...",
     "plan": "..."
-}
+}}
 
 Transcript:
 {transcript_text}"""

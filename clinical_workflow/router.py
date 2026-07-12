@@ -1,16 +1,16 @@
 # clinical_workflow/router.py
 """
-FastAPI router for the Stage 4 Clinical Documentation Workflow (LangGraph).
+FastAPI router for the Clinical Documentation Workflow (LangGraph).
 
 Exposes endpoints to start the workflow and review/approve generated SOAP notes.
+The Gemini API key is injected at runtime via the X-Gemini-API-Key request header,
+so it never needs to be stored in .env files or server configuration.
 """
-import os
 import uuid
 import logging
 from typing import Optional
-from pathlib import Path
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, Form, Header, HTTPException
 from pydantic import BaseModel
 from langgraph.checkpoint.memory import MemorySaver
 
@@ -27,11 +27,6 @@ workflow_app = build_clinical_workflow().compile(
     checkpointer=checkpointer,
     interrupt_before=["approval"]
 )
-
-# Upload directory setup
-BASE_DIR = Path(__file__).parent.parent
-UPLOAD_DIR = BASE_DIR / "uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 class WorkflowStateResponse(BaseModel):
@@ -56,62 +51,41 @@ class ReviewRequest(BaseModel):
 async def start_workflow(
     patient_name: str = Form(...),
     raw_transcript: Optional[str] = Form(None),
-    file: Optional[UploadFile] = File(None)
+    x_gemini_api_key: Optional[str] = Header(None),
 ):
     """
     Start the clinical documentation workflow.
 
     Accepts:
     - patient_name: Name of the patient (for DB records).
-    - raw_transcript: Optional text transcript of the consultation.
-    - file: Optional audio recording of the consultation.
+    - raw_transcript: Text transcript of the consultation.
+    - X-Gemini-API-Key: Gemini API key passed from the UI at runtime.
 
-    Either `raw_transcript` or `file` must be provided.
+    The transcript is required.
     """
-    if not raw_transcript and not file:
+    if not raw_transcript or not raw_transcript.strip():
         raise HTTPException(
             status_code=400,
-            detail="Either raw_transcript or an audio file must be provided."
+            detail="raw_transcript is required. Audio upload is not supported in v1.0."
         )
 
-    audio_path = ""
-    if file:
-        ext = Path(file.filename).suffix.lower()
-        allowed_exts = {".wav", ".mp3", ".m4a", ".ogg", ".flac", ".webm"}
-        if ext not in allowed_exts:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported file format: {ext}. Allowed: {allowed_exts}"
-            )
-
-        filename = f"{uuid.uuid4()}_{file.filename}"
-        audio_path = str(UPLOAD_DIR / filename)
-        try:
-            contents = await file.read()
-            with open(audio_path, "wb") as f:
-                f.write(contents)
-            logger.info("Saved audio upload to %s", audio_path)
-        except Exception as e:
-            logger.error("Failed to write audio file: %s", e)
-            raise HTTPException(status_code=500, detail="Failed to save uploaded audio file.")
-
-    # Unique thread ID for tracking this specific patient session in LangGraph memory
     thread_id = str(uuid.uuid4())
-    config = {"configurable": {"thread_id": thread_id}}
+    config = {
+        "configurable": {
+            "thread_id": thread_id,
+            "api_key": x_gemini_api_key,
+        }
+    }
 
     initial_state = {
-        "audio_path": audio_path,
         "patient_name": patient_name,
-        "raw_transcript": raw_transcript or "",
+        "raw_transcript": raw_transcript.strip(),
         "retry_count": 0,
     }
 
     logger.info("Initializing workflow thread %s for %s", thread_id, patient_name)
     try:
-        # Executes graph until it reaches the approval node (interrupted)
         workflow_app.invoke(initial_state, config)
-        
-        # Extract the state values
         state_info = workflow_app.get_state(config)
         return WorkflowStateResponse(
             thread_id=thread_id,
@@ -120,16 +94,14 @@ async def start_workflow(
         )
     except Exception as e:
         logger.error("Workflow failed on thread %s: %s", thread_id, e, exc_info=True)
-        if audio_path and os.path.exists(audio_path):
-            try:
-                os.remove(audio_path)
-            except OSError:
-                pass
         raise HTTPException(status_code=500, detail=f"Workflow execution failed: {str(e)}")
 
 
 @router.post("/review", response_model=WorkflowStateResponse)
-async def review_workflow(request: ReviewRequest):
+async def review_workflow(
+    request: ReviewRequest,
+    x_gemini_api_key: Optional[str] = Header(None),
+):
     """
     Approve or reject/correct the generated SOAP note.
 
@@ -142,7 +114,12 @@ async def review_workflow(request: ReviewRequest):
     - Interrupts again at the approval step, returning status "pending_approval" with changes.
     """
     thread_id = request.thread_id
-    config = {"configurable": {"thread_id": thread_id}}
+    config = {
+        "configurable": {
+            "thread_id": thread_id,
+            "api_key": x_gemini_api_key,
+        }
+    }
 
     state_info = workflow_app.get_state(config)
     if not state_info or not state_info.values:
@@ -161,7 +138,6 @@ async def review_workflow(request: ReviewRequest):
 
     logger.info("Submitting review for thread %s: approved=%s", thread_id, request.approve)
     try:
-        # Build update state dictionary
         state_update = {
             "doctor_approved": request.approve,
             "doctor_feedback": request.feedback or ""
@@ -181,10 +157,8 @@ async def review_workflow(request: ReviewRequest):
         # Resume graph execution (will execute approval node and route accordingly)
         workflow_app.invoke(None, config)
 
-        # Retrieve updated state
         updated_state_info = workflow_app.get_state(config)
         updated_state = updated_state_info.values
-
         status = "completed" if not updated_state_info.next else "pending_approval"
 
         return WorkflowStateResponse(

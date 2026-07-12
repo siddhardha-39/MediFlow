@@ -4,15 +4,13 @@ FastAPI router for the Patient History Summarizer Agent and Hospital Dashboard.
 
 Exposes endpoints to list patients, get patient history, and query hospital stats.
 """
-import json
 import logging
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 from llm_factory import get_chat_llm
 from langchain_core.messages import HumanMessage
 
-from config import MEDIFLOW_LLM_MODEL
 from agents.Patient_history_summeriser import summarize_patient
 from database.db import (
     list_patients,
@@ -41,7 +39,6 @@ class BriefingResponse(BaseModel):
 class AskRequest(BaseModel):
     """Request body for dashboard Q&A."""
     query: str
-    model_name: Optional[str] = MEDIFLOW_LLM_MODEL
 
 
 # ── Patient Router Endpoints ──────────────────────────────────────────────────
@@ -57,19 +54,23 @@ async def get_all_patients():
 
 
 @router.get("/{patient_id}/briefing", response_model=BriefingResponse)
-async def get_patient_briefing(patient_id: str, model_name: str = MEDIFLOW_LLM_MODEL):
+async def get_patient_briefing(
+    patient_id: str,
+    x_gemini_api_key: Optional[str] = Header(None),
+):
     """
     Generate a structured 1-page clinical briefing of a patient's medical history.
 
-    Queries ChromaDB vector store for the patient's records and uses a local
-    LLM (default: llama3.2:1b) to compile the briefing.
+    Queries ChromaDB vector store for the patient's records and uses the
+    Gemini LLM to compile the briefing. Pass the Gemini API key via the
+    X-Gemini-API-Key header.
     """
     if not patient_id.strip():
         raise HTTPException(status_code=400, detail="patient_id cannot be empty")
 
-    logger.info("Generating briefing for patient: %s using model: %s", patient_id, model_name)
+    logger.info("Generating briefing for patient: %s", patient_id)
     try:
-        briefing = summarize_patient(patient_id, model_name=model_name)
+        briefing = summarize_patient(patient_id, api_key=x_gemini_api_key)
         return BriefingResponse(patient_id=patient_id, briefing=briefing)
     except Exception as e:
         logger.error("Failed to generate patient briefing for %s: %s", patient_id, e, exc_info=True)
@@ -161,8 +162,11 @@ Manager's Query: {query}
 
 
 @dashboard_router.post("/ask")
-async def ask_dashboard(request: AskRequest):
-    """Answer hospital management queries using a local LLM and database statistics."""
+async def ask_dashboard(
+    request: AskRequest,
+    x_gemini_api_key: Optional[str] = Header(None),
+):
+    """Answer hospital management queries using Gemini and database statistics."""
     if not request.query.strip():
         raise HTTPException(status_code=400, detail="Query cannot be empty")
     stats = get_db_stats()
@@ -175,13 +179,12 @@ async def ask_dashboard(request: AskRequest):
             allergies_summary=stats["allergies_summary"],
             query=request.query
         )
-        llm = get_chat_llm(model_name=request.model_name, temperature=0.0)
+        llm = get_chat_llm(temperature=0.0, api_key=x_gemini_api_key)
         response = llm.invoke([HumanMessage(content=prompt)])
         return {"query": request.query, "answer": response.content.strip()}
     except Exception as e:
         logger.error("Dashboard QA failed: %s", e)
-        # Graceful fallback if Ollama is offline or fails
         return {
             "query": request.query,
-            "answer": f"Note: Local LLM service is offline. Direct aggregated stats are: {stats['total_patients']} patients and {stats['total_sessions']} sessions in system."
+            "answer": f"Gemini service unavailable. Direct stats: {stats['total_patients']} patients, {stats['total_sessions']} sessions."
         }

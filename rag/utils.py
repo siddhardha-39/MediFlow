@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from config import MEDIFLOW_EMBEDDING_MODEL, RAG_EMBEDDING_PROVIDER
+from config import RAG_EMBEDDING_PROVIDER
 
 try:
     from dotenv import load_dotenv
@@ -54,35 +54,26 @@ def _load_env() -> None:
         load_dotenv(PROJECT_ROOT / ".env")
 
 
-def get_embedding_provider(provider: Optional[str] = None) -> str:
-    """Return the configured embedding provider name."""
-    _load_env()
-    selected = provider or RAG_EMBEDDING_PROVIDER
-    selected = selected.strip().lower()
-    if selected not in {"ollama", "huggingface"}:
-        raise ValueError("RAG_EMBEDDING_PROVIDER must be 'ollama' or 'huggingface'")
-    return selected
-
-
 def get_embedding_model(provider: Optional[str] = None, model_name: Optional[str] = None):
     """
-    Build the configured embedding model lazily.
+    Build a HuggingFace embedding model (runs in-process, no external server required).
 
-    Defaults:
-    - ollama: nomic-embed-text
-    - huggingface: BAAI/bge-small-en
+    Default model: BAAI/bge-small-en
+    Override via environment variable: RAG_HUGGINGFACE_EMBEDDING_MODEL
     """
-    selected = get_embedding_provider(provider)
-    if selected == "huggingface":
-        from langchain_huggingface import HuggingFaceEmbeddings
+    _load_env()
+    selected = (provider or RAG_EMBEDDING_PROVIDER).strip().lower()
 
-        model = model_name or os.getenv("RAG_HUGGINGFACE_EMBEDDING_MODEL", "BAAI/bge-small-en")
-        return HuggingFaceEmbeddings(model_name=model)
+    if selected not in {"huggingface"}:
+        raise ValueError(
+            f"RAG_EMBEDDING_PROVIDER must be 'huggingface', got '{selected}'. "
+            "Ollama embeddings have been removed in v1.0."
+        )
 
-    from langchain_ollama import OllamaEmbeddings
+    from langchain_huggingface import HuggingFaceEmbeddings
 
-    model = model_name or os.getenv("RAG_OLLAMA_EMBEDDING_MODEL") or MEDIFLOW_EMBEDDING_MODEL
-    return OllamaEmbeddings(model=model)
+    model = model_name or os.getenv("RAG_HUGGINGFACE_EMBEDDING_MODEL", "BAAI/bge-small-en")
+    return HuggingFaceEmbeddings(model_name=model)
 
 
 def get_chroma_class():

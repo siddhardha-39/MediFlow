@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from config import MEDIFLOW_LLM_MODEL
+from typing import Optional
 from llm_factory import get_chat_llm
 from .utils import get_logger
 
@@ -10,8 +10,8 @@ logger = get_logger("rag.query_engine")
 class RAGQueryEngine:
     """Strict grounded answer generation over retrieved clinical context."""
 
-    def __init__(self, model_name: str = MEDIFLOW_LLM_MODEL, temperature: float = 0.0):
-        self.llm = get_chat_llm(model_name=model_name, temperature=temperature)
+    def __init__(self, api_key: Optional[str] = None, temperature: float = 0.0):
+        self.llm = get_chat_llm(temperature=temperature, api_key=api_key)
 
     def _invoke_or_default(self, prompt: str, default: str) -> str:
         try:

@@ -8,12 +8,17 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from config import MEDIFLOW_API_URL, MEDIFLOW_LLM_MODEL
+from config import MEDIFLOW_API_URL
 
 # Page settings
 st.set_page_config(page_title="MediFlow AI", page_icon="M", layout="wide")
 
 API_URL = MEDIFLOW_API_URL
+
+
+def get_api_headers() -> dict:
+    api_key = st.session_state.get("gemini_api_key", "").strip()
+    return {"X-Gemini-API-Key": api_key} if api_key else {}
 
 # ── Custom CSS Styling ────────────────────────────────────────────────────────
 st.markdown("""
@@ -301,7 +306,7 @@ def check_backend_health():
 
 def fetch_patients():
     try:
-        resp = httpx.get(f"{API_URL}/api/patients", timeout=5)
+        resp = httpx.get(f"{API_URL}/api/patients", timeout=5, headers=get_api_headers())
         if resp.status_code == 200:
             return resp.json()
     except Exception as e:
@@ -311,18 +316,13 @@ def fetch_patients():
 
 def fetch_patient_briefing(patient_id):
     try:
-        resp = httpx.get(f"{API_URL}/api/patients/{patient_id}/briefing", timeout=60)
+        resp = httpx.get(f"{API_URL}/api/patients/{patient_id}/briefing", timeout=60, headers=get_api_headers())
         if resp.status_code == 200:
             return resp.json().get("briefing", "")
         try:
             detail = str(resp.json().get("detail", ""))
         except Exception:
             detail = resp.text
-        if "ollama" in detail.lower() or "connect" in detail.lower():
-            return (
-                "AI model service is offline. Start Ollama and pull the configured models "
-                f"to enable RAG briefings. Current model: {MEDIFLOW_LLM_MODEL}."
-            )
         return f"Backend returned status {resp.status_code}: {detail}"
     except Exception as e:
         return f"Connection error: {e}. Is the FastAPI backend running at {API_URL}?"
@@ -330,7 +330,7 @@ def fetch_patient_briefing(patient_id):
 
 def fetch_patient_history(patient_id):
     try:
-        resp = httpx.get(f"{API_URL}/api/patients/{patient_id}/history", timeout=5)
+        resp = httpx.get(f"{API_URL}/api/patients/{patient_id}/history", timeout=5, headers=get_api_headers())
         if resp.status_code == 200:
             return resp.json().get("history", "")
     except Exception as e:
@@ -340,7 +340,7 @@ def fetch_patient_history(patient_id):
 
 def fetch_patient_sessions(patient_id):
     try:
-        resp = httpx.get(f"{API_URL}/api/patients/{patient_id}/sessions", timeout=5)
+        resp = httpx.get(f"{API_URL}/api/patients/{patient_id}/sessions", timeout=5, headers=get_api_headers())
         if resp.status_code == 200:
             return resp.json()
     except Exception as e:
@@ -348,16 +348,13 @@ def fetch_patient_sessions(patient_id):
     return []
 
 
-def start_workflow_api(patient_name, raw_transcript=None, audio_file=None):
+def start_workflow_api(patient_name, raw_transcript=None):
     try:
-        files = None
         data = {"patient_name": patient_name}
         if raw_transcript:
             data["raw_transcript"] = raw_transcript
-        if audio_file:
-            files = {"file": (audio_file.name, audio_file.getvalue(), audio_file.type)}
         
-        resp = httpx.post(f"{API_URL}/api/workflow/start", data=data, files=files, timeout=120)
+        resp = httpx.post(f"{API_URL}/api/workflow/start", data=data, timeout=120, headers=get_api_headers())
         if resp.status_code == 200:
             return resp.json()
         else:
@@ -377,7 +374,7 @@ def review_workflow_api(thread_id, approve, feedback="", soap_data=None):
         if soap_data:
             payload.update(soap_data)
             
-        resp = httpx.post(f"{API_URL}/api/workflow/review", json=payload, timeout=120)
+        resp = httpx.post(f"{API_URL}/api/workflow/review", json=payload, timeout=120, headers=get_api_headers())
         if resp.status_code == 200:
             return resp.json()
         else:
@@ -389,7 +386,7 @@ def review_workflow_api(thread_id, approve, feedback="", soap_data=None):
 
 def fetch_dashboard_stats():
     try:
-        resp = httpx.get(f"{API_URL}/api/dashboard/stats", timeout=5)
+        resp = httpx.get(f"{API_URL}/api/dashboard/stats", timeout=5, headers=get_api_headers())
         if resp.status_code == 200:
             return resp.json()
     except Exception as e:
@@ -399,7 +396,7 @@ def fetch_dashboard_stats():
 
 def ask_dashboard_api(query):
     try:
-        resp = httpx.post(f"{API_URL}/api/dashboard/ask", json={"query": query}, timeout=30)
+        resp = httpx.post(f"{API_URL}/api/dashboard/ask", json={"query": query}, timeout=30, headers=get_api_headers())
         if resp.status_code == 200:
             return resp.json().get("answer", "")
     except Exception as e:
@@ -421,6 +418,19 @@ def resolve_rag_patient_id(patient_info):
 
 
 # ── Render UI ─────────────────────────────────────────────────────────────────
+
+if "gemini_api_key" not in st.session_state:
+    st.session_state.gemini_api_key = ""
+
+st.markdown("### Gemini API Key")
+st.caption("Stored only in this Streamlit session and sent to the backend as `X-Gemini-API-Key`.")
+st.session_state.gemini_api_key = st.text_input(
+    "Gemini API Key",
+    type="password",
+    value=st.session_state.gemini_api_key,
+    placeholder="Paste your Gemini API key here",
+    label_visibility="collapsed",
+).strip()
 
 # Header
 col_title, col_status = st.columns([4, 1])
@@ -484,38 +494,22 @@ with tab_clinical:
             
         patient_name = new_pat_name if selected_pat == "-- Create New --" or not selected_pat else selected_pat
         
-        # Audio / Text toggle
-        input_mode = st.radio("Select Input Mode", options=["Upload Consultation Audio", "Paste Text Transcript"])
-        
-        audio_file = None
-        text_transcript = ""
-        
-        if input_mode == "Upload Consultation Audio":
-            audio_file = st.file_uploader(
-                "Upload dictation recording (WAV, MP3, M4A)", 
-                type=["wav", "mp3", "m4a", "ogg", "flac"]
-            )
-            st.info("Whisper model runs locally. Audio will be preprocessed to 16kHz mono.")
-        else:
-            text_transcript = st.text_area(
-                "Paste Rough Transcript",
-                placeholder="Doctor: How are you today?\nPatient: I have had a headache for 3 days...",
-                height=150
-            )
+        text_transcript = st.text_area(
+            "Paste Rough Transcript",
+            placeholder="Doctor: How are you today?\nPatient: I have had a headache for 3 days...",
+            height=180
+        )
 
         if st.button("Process and Generate SOAP Draft", type="primary"):
             if not patient_name.strip():
                 st.warning("Please specify a patient name.")
-            elif input_mode == "Upload Consultation Audio" and not audio_file:
-                st.warning("Please upload an audio file.")
-            elif input_mode == "Paste Text Transcript" and not text_transcript.strip():
+            elif not text_transcript.strip():
                 st.warning("Please provide a transcript.")
             else:
                 with st.spinner("Processing clinical documentation (this might take a few moments)..."):
                     res = start_workflow_api(
                         patient_name=patient_name,
-                        raw_transcript=text_transcript if input_mode == "Paste Text Transcript" else None,
-                        audio_file=audio_file
+                        raw_transcript=text_transcript,
                     )
                     if res:
                         st.session_state.active_thread_id = res["thread_id"]
@@ -607,41 +601,13 @@ with tab_clinical:
             else:
                 st.success("SOAP note conforms to clinical completeness guidelines.")
                 
-            # ── LanguageTool Suggestions ──────────────────────────────────────
-            st.markdown("### Language & Grammar Suggestions")
-            lt_status = state.get("languagetool_status", {})
-            lt_warnings = state.get("languagetool_warnings", [])
-
-            if not lt_status:
-                st.info("Grammar check has not been run for this session.")
-            elif not lt_status.get("success", False):
-                err_type = lt_status.get("error_type", "unknown")
-                st.warning(f"⚠️ LanguageTool service is offline or unreachable ({err_type}). Grammar and style check skipped.")
+            st.markdown("### Validation Checks")
+            validation_warnings = state.get("validation_warnings", [])
+            if validation_warnings:
+                for warning in validation_warnings:
+                    st.warning(warning)
             else:
-                if not lt_warnings:
-                    st.info("No grammar or style issues detected.")
-                else:
-                    # Group by SOAP section
-                    grouped_warnings = {}
-                    for w in lt_warnings:
-                        sec = w.get("section", "General")
-                        if sec not in grouped_warnings:
-                            grouped_warnings[sec] = []
-                        grouped_warnings[sec].append(w)
-
-                    for sec, warnings_in_sec in grouped_warnings.items():
-                        with st.expander(f"📌 {sec} Section ({len(warnings_in_sec)} suggestions)", expanded=True):
-                            for idx, w in enumerate(warnings_in_sec):
-                                matched = w.get("matched_text", "")
-                                message = w.get("message", "")
-                                reps = w.get("replacements", [])
-
-                                st.markdown(f"**Suggestion {idx + 1}**: {message}")
-                                if matched:
-                                    st.markdown(f"- *Matched text*: `{matched}`")
-                                if reps:
-                                    st.markdown(f"- *Suggested replacements*: {', '.join([f'`{r}`' for r in reps[:5]])}")
-                                st.write("")
+                st.info("Local completeness checks passed.")
 
             # Extracted Medical Entities
             st.markdown("### Extracted Entities")
@@ -698,7 +664,7 @@ with tab_rag:
         
         with col_b_left:
             st.subheader("Grounded 30-Second Clinical Briefing")
-            st.caption("Retrieves clinical records from ChromaDB + cross-references guidelines via local Llama 3.")
+            st.caption("Retrieves clinical records from ChromaDB and compiles a grounded briefing with the current session key.")
             
             rag_patient_id = resolve_rag_patient_id(patient_info)
 

@@ -16,9 +16,10 @@ LANGGRAPH CONCEPT — RETRIES VIA GRAPH EDGES:
     - The graph can be visualized showing the retry path
 """
 import logging
+from typing import Optional
 from langchain_core.messages import HumanMessage
+from langchain_core.runnables import RunnableConfig
 
-from config import MEDIFLOW_LLM_MODEL
 from llm_factory import get_chat_llm
 from clinical_workflow.state import ClinicalWorkflowState
 from clinical_workflow.utils import parse_llm_json
@@ -26,17 +27,17 @@ from clinical_workflow.prompts import SOAP_GENERATION_PROMPT
 
 logger = logging.getLogger("workflow.node.soap_formatter")
 
-# Same model, deterministic
-llm = get_chat_llm(temperature=0.0)
 
-
-def soap_formatter_node(state: ClinicalWorkflowState) -> dict:
+def soap_formatter_node(state: ClinicalWorkflowState, config: RunnableConfig = None) -> dict:
     """
     Generate SOAP note from cleaned transcript using LLM.
 
     Reads:  state["clean_transcript"], state["retry_count"]
     Writes: state["soap_*"] fields, increments retry_count
     """
+    api_key: Optional[str] = (config or {}).get("configurable", {}).get("api_key")
+    llm = get_chat_llm(temperature=0.0, api_key=api_key)
+
     transcript = state.get("clean_transcript", "") or state.get("raw_transcript", "")
     retry_count = state.get("retry_count", 0)
 

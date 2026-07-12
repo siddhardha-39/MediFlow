@@ -1,6 +1,7 @@
 from __future__ import annotations
 import sys
 from pathlib import Path
+from typing import Optional
 
 # Add project root to sys.path so we can import from document_loading and db
 sys.path.append(str(Path(__file__).parent.parent))
@@ -9,7 +10,6 @@ from langchain_core.prompts import ChatPromptTemplate
 from llm_factory import get_chat_llm
 from langchain_core.output_parsers import StrOutputParser
 
-from config import MEDIFLOW_LLM_MODEL
 from rag.service import generate_grounded_patient_briefing
 
 MEDICAL_SUMMARY_PROMPT = """You are a clinical assistant helping doctors prepare for patient consultations.
@@ -49,11 +49,11 @@ RELEVANT PATIENT RECORD EXTRACTS:
 def generate_patient_briefing(
     patient_record_context: str,
     *,
-    model_name: str = MEDIFLOW_LLM_MODEL,
+    api_key: Optional[str] = None,
     temperature: float = 0.0,
 ) -> str:
     # LLM
-    llm = get_chat_llm(model_name=model_name, temperature=temperature)
+    llm = get_chat_llm(temperature=temperature, api_key=api_key)
     
     prompt = ChatPromptTemplate.from_messages([
         ("system", "You are a clinical assistant. Always follow the exact format given. Never add extra commentary."),
@@ -67,7 +67,7 @@ def generate_patient_briefing(
 def summarize_patient(
     patient_id: str,
     *,
-    model_name: str = MEDIFLOW_LLM_MODEL,
+    api_key: Optional[str] = None,
 ) -> str:
     """
     Generate a grounded doctor briefing from the upgraded RAG pipeline.
@@ -75,7 +75,7 @@ def summarize_patient(
     The public return type remains a plain string so the existing FastAPI
     response shape stays unchanged.
     """
-    return generate_grounded_patient_briefing(patient_id, model_name=model_name)
+    return generate_grounded_patient_briefing(patient_id, api_key=api_key)
 
 if __name__ == "__main__":
     # Test with the ID of our mock patient instead of the file path

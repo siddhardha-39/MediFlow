@@ -49,19 +49,18 @@ class TestAPIStage4(unittest.TestCase):
         """Verify the Patient History Summarizer briefing GET endpoint."""
         patient_id = "PT-2024-001-Rajesh-Kumar"
         print(f"\n  [TEST] Requesting briefing for patient: {patient_id}...")
-        response = self.client.get(f"/api/patients/{patient_id}/briefing")
+        response = self.client.get(
+            f"/api/patients/{patient_id}/briefing",
+            headers={"X-Gemini-API-Key": "test-key"},
+        )
 
-        # Handles cases where Ollama might be unavailable by verifying fallback statuses
-        if response.status_code == 200:
-            data = response.json()
-            self.assertEqual(data["patient_id"], patient_id)
-            self.assertIn("briefing", data)
-            self.assertIn("PATIENT BRIEFING", data["briefing"])
-            print("  [TEST] Briefing generated successfully:\n")
-            print(data["briefing"][:350] + "\n...")
-        else:
-            print(f"  [TEST] Briefing request returned code: {response.status_code} (Check Ollama status)")
-            self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["patient_id"], patient_id)
+        self.assertIn("briefing", data)
+        self.assertIn("PATIENT BRIEFING", data["briefing"])
+        print("  [TEST] Briefing generated successfully:\n")
+        print(data["briefing"][:350] + "\n...")
 
     def test_workflow_api_lifecycle(self):
         """Verify starting the workflow, submitting corrections, and final approval/persistence."""
@@ -74,13 +73,11 @@ class TestAPIStage4(unittest.TestCase):
             data={
                 "patient_name": patient_name,
                 "raw_transcript": SAMPLE_TEXT
-            }
+            },
+            headers={"X-Gemini-API-Key": "test-key"},
         )
 
-        if response.status_code != 200:
-            print(f"  [TEST] Workflow start failed: {response.status_code} - {response.text}")
-            self.assertEqual(response.status_code, 500)
-            return
+        self.assertEqual(response.status_code, 200)
 
         data = response.json()
         self.assertIn("thread_id", data)
@@ -106,7 +103,8 @@ class TestAPIStage4(unittest.TestCase):
                 "thread_id": thread_id,
                 "approve": False,
                 "feedback": feedback
-            }
+            },
+            headers={"X-Gemini-API-Key": "test-key"},
         )
 
         self.assertEqual(response_review.status_code, 200)
@@ -127,7 +125,8 @@ class TestAPIStage4(unittest.TestCase):
                 "thread_id": thread_id,
                 "approve": True,
                 "feedback": ""
-            }
+            },
+            headers={"X-Gemini-API-Key": "test-key"},
         )
 
         self.assertEqual(response_approve.status_code, 200)

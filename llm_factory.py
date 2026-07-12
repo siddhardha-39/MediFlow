@@ -1,92 +1,63 @@
-import os
 import logging
-
-from config import MEDIFLOW_LLM_MODEL
+from typing import Optional
 
 logger = logging.getLogger("llm_factory")
 
-def get_llm_provider() -> str:
-    """Determine the configured LLM provider."""
-    # Check explicitly defined provider first
-    provider = os.getenv("MEDIFLOW_LLM_PROVIDER", "").strip().lower()
-    if provider:
-        return provider
 
-    # Fallback heuristic: check if API keys are set
-    if os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"):
-        return "gemini"
-    
-    return "ollama"
+class _CleanChatGoogleGenerativeAI:
+    """
+    Thin wrapper around ChatGoogleGenerativeAI that collapses list-format
+    content blocks (produced by thinking-enabled Gemma models) into a single
+    plain string before returning the response.
+    """
+    def __new__(cls, *args, **kwargs):
+        from langchain_google_genai import ChatGoogleGenerativeAI
 
-# Subclass ChatGoogleGenerativeAI to extract only the text content block (handling thinking blocks in Gemma 4)
-def get_clean_chat_google_generative_ai_class():
-    from langchain_google_genai import ChatGoogleGenerativeAI
-    
-    class CleanChatGoogleGenerativeAI(ChatGoogleGenerativeAI):
-        def invoke(self, *args, **kwargs):
-            response = super().invoke(*args, **kwargs)
-            if hasattr(response, "content") and isinstance(response.content, list):
-                text_parts = []
-                for part in response.content:
-                    if isinstance(part, dict):
-                        if part.get("type") == "text":
-                            text_parts.append(part.get("text", ""))
-                    elif isinstance(part, str):
-                        text_parts.append(part)
-                response.content = "".join(text_parts)
-            return response
-            
-    return CleanChatGoogleGenerativeAI
+        class _Inner(ChatGoogleGenerativeAI):
+            def invoke(self, *a, **kw):
+                response = super().invoke(*a, **kw)
+                if hasattr(response, "content") and isinstance(response.content, list):
+                    text_parts = [
+                        (part.get("text", "") if isinstance(part, dict) else part)
+                        for part in response.content
+                        if not isinstance(part, dict) or part.get("type") == "text"
+                    ]
+                    response.content = "".join(text_parts)
+                return response
 
-def get_chat_llm(model_name: str = None, temperature: float = 0.0):
-    """
-    Get a chat model instance (CleanChatGoogleGenerativeAI or ChatOllama)
-    based on the configured provider.
-    """
-    model = model_name or MEDIFLOW_LLM_MODEL
-    provider = get_llm_provider()
-    
-    logger.info("Initializing chat LLM: provider=%s, model=%s, temp=%.1f", provider, model, temperature)
-    
-    if provider == "gemini":
-        CleanChatGoogleGenerativeAI = get_clean_chat_google_generative_ai_class()
-        
-        # Verify API key
-        api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-        if not api_key:
-            logger.warning("Gemini API key is not set, ChatGoogleGenerativeAI might fail.")
-            
-        return CleanChatGoogleGenerativeAI(
-            model=model,
-            temperature=temperature,
-            google_api_key=api_key
-        )
-    else:
-        from langchain_ollama import ChatOllama
-        return ChatOllama(model=model, temperature=temperature)
+        return _Inner(*args, **kwargs)
 
-def get_llm(model_name: str = None, temperature: float = 0.0):
+
+def get_chat_llm(
+    model_name: str = "gemma-4-31b-it",
+    temperature: float = 0.0,
+    api_key: Optional[str] = None,
+):
     """
-    Get a legacy text completion model instance (GoogleGenerativeAI or OllamaLLM)
-    based on the configured provider.
+    Return a ChatGoogleGenerativeAI instance.
+
+    Parameters
+    ----------
+    model_name : str
+        Gemini/Gemma model identifier (default: gemma-4-31b-it).
+    temperature : float
+        Sampling temperature (0.0 = deterministic).
+    api_key : str, optional
+        Google Gemini API key.  When provided, it overrides any key found in
+        environment variables, enabling per-request API key injection from
+        the Streamlit UI without touching .env files.
     """
-    model = model_name or MEDIFLOW_LLM_MODEL
-    provider = get_llm_provider()
-    
-    logger.info("Initializing LLM: provider=%s, model=%s, temp=%.1f", provider, model, temperature)
-    
-    if provider == "gemini":
-        from langchain_google_genai import GoogleGenerativeAI
-        
-        api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-        if not api_key:
-            logger.warning("Gemini API key is not set, GoogleGenerativeAI might fail.")
-            
-        return GoogleGenerativeAI(
-            model=model,
-            temperature=temperature,
-            google_api_key=api_key
-        )
-    else:
-        from langchain_ollama import OllamaLLM
-        return OllamaLLM(model=model, temperature=temperature)
+    import os
+    resolved_key = api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    if not resolved_key:
+        logger.warning("No Gemini API key found. Calls to the LLM will fail.")
+
+    logger.info(
+        "Initializing ChatGoogleGenerativeAI: model=%s, temp=%.1f, key_source=%s",
+        model_name, temperature, "runtime" if api_key else "env",
+    )
+    return _CleanChatGoogleGenerativeAI(
+        model=model_name,
+        temperature=temperature,
+        google_api_key=resolved_key,
+    )

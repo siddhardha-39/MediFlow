@@ -3,7 +3,7 @@
 Raw LLM extraction layer.
 
 Responsibilities:
-- Initialise the local Ollama model
+- Initialise the configured Gemini chat model lazily
 - Send the extraction prompt
 - Return the raw string response
 
@@ -23,7 +23,8 @@ logger = get_logger("extractor")
 MODEL_NAME  = MEDIFLOW_LLM_MODEL
 TEMPERATURE = 0.0        # deterministic — essential for structured extraction
 
-llm = get_chat_llm(model_name=MODEL_NAME, temperature=TEMPERATURE)
+def _get_llm():
+    return get_chat_llm(model_name=MODEL_NAME, temperature=TEMPERATURE)
 
 
 # ── Public API ─────────────────────────────────────────────────────────────────
@@ -41,7 +42,7 @@ def extract_raw(patient_text: str) -> str:
     prompt = EXTRACTION_PROMPT.format(patient_text=patient_text)
     logger.info("Sending extraction prompt for patient text: %s", truncate(patient_text))
 
-    response = llm.invoke([HumanMessage(content=prompt)])
+    response = _get_llm().invoke([HumanMessage(content=prompt)])
     raw = response.content.strip()
 
     logger.debug("Raw LLM output: %s", truncate(raw))
@@ -67,7 +68,7 @@ def extract_retry(patient_text: str, previous_response: str, error: str) -> str:
     )
     logger.warning("Retrying extraction. Previous error: %s", error)
 
-    response = llm.invoke([HumanMessage(content=prompt)])
+    response = _get_llm().invoke([HumanMessage(content=prompt)])
     raw = response.content.strip()
 
     logger.debug("Retry raw output: %s", truncate(raw))

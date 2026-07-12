@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from config import MEDIFLOW_LLM_MODEL
 from .ingestor import RAGIngestor
 from .query_engine import RAGQueryEngine
 from .retriever import RAGRetriever
@@ -108,7 +107,7 @@ def retrieve_guideline_context(query: str, k: int = 4) -> str:
 def generate_grounded_patient_briefing(
     patient_id: str,
     *,
-    model_name: str = MEDIFLOW_LLM_MODEL,
+    api_key: Optional[str] = None,
     patient_query: Optional[str] = None,
 ) -> str:
     """Generate a grounded doctor briefing using patient RAG plus optional guideline RAG."""
@@ -122,7 +121,7 @@ def generate_grounded_patient_briefing(
         "clinical safety alerts allergies medications contraindications follow-up",
         k=3,
     )
-    return RAGQueryEngine(model_name=model_name).generate_patient_briefing(
+    return RAGQueryEngine(api_key=api_key).generate_patient_briefing(
         patient_context=patient_context,
         guideline_context=guideline_context,
     )
