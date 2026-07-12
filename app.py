@@ -13,10 +13,9 @@ from fastapi import FastAPI
 from database.db import init_db
 
 # Import routers
-from transcription.router import router as transcription_router
-from soap_notes.router import router as soap_router
 from agents.router import router as patient_router, dashboard_router
 from clinical_workflow.router import router as workflow_router
+
 # ── Logging ────────────────────────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
@@ -28,12 +27,10 @@ logging.basicConfig(
 app = FastAPI(
     title="MediFlow API",
     description="AI-powered clinical documentation system",
-    version="0.4.0",
+    version="1.0.0",
 )
 
 # Mount routers
-app.include_router(transcription_router)
-app.include_router(soap_router)
 app.include_router(patient_router)
 app.include_router(dashboard_router)
 app.include_router(workflow_router)
@@ -47,7 +44,7 @@ def startup():
 @app.get("/health")
 def health_check():
     """Health check endpoint."""
-    return {"status": "healthy", "version": "0.4.0"}
+    return {"status": "healthy", "version": "1.0.0"}
 
 
 if __name__ == "__main__":

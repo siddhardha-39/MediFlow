@@ -9,7 +9,7 @@ import logging
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from langchain_ollama import ChatOllama
+from llm_factory import get_chat_llm
 from langchain_core.messages import HumanMessage
 
 from config import MEDIFLOW_LLM_MODEL
@@ -175,7 +175,7 @@ async def ask_dashboard(request: AskRequest):
             allergies_summary=stats["allergies_summary"],
             query=request.query
         )
-        llm = ChatOllama(model=request.model_name, temperature=0.0)
+        llm = get_chat_llm(model_name=request.model_name, temperature=0.0)
         response = llm.invoke([HumanMessage(content=prompt)])
         return {"query": request.query, "answer": response.content.strip()}
     except Exception as e:

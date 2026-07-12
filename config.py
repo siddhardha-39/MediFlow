@@ -21,49 +21,22 @@ def get_setting(name: str, default: str) -> str:
     return value.strip() or default
 
 
-MEDIFLOW_LLM_MODEL = get_setting("MEDIFLOW_LLM_MODEL", "llama3.2:1b")
-MEDIFLOW_EMBEDDING_MODEL = get_setting("MEDIFLOW_EMBEDDING_MODEL", "nomic-embed-text")
+# ── LLM Configuration ─────────────────────────────────────────────────────────
+# MediFlow v1 uses Google Gemini exclusively.
+# The Gemini API key is provided at runtime via the Streamlit UI (not stored here).
+MEDIFLOW_LLM_MODEL = get_setting("MEDIFLOW_LLM_MODEL", "gemma-4-31b-it")
+
+# ── API Configuration ─────────────────────────────────────────────────────────
 MEDIFLOW_API_URL = get_setting("MEDIFLOW_API_URL", "http://localhost:8000")
-RAG_EMBEDDING_PROVIDER = get_setting("RAG_EMBEDDING_PROVIDER", "ollama").lower()
 
-# ── PostgreSQL Configuration ──────────────────────────────────────────────────
-MEDIFLOW_POSTGRES_HOST = get_setting("MEDIFLOW_POSTGRES_HOST", "")
-MEDIFLOW_POSTGRES_DB = get_setting("MEDIFLOW_POSTGRES_DB", "")
-MEDIFLOW_POSTGRES_USER = get_setting("MEDIFLOW_POSTGRES_USER", "")
-MEDIFLOW_POSTGRES_PASSWORD = os.getenv("MEDIFLOW_POSTGRES_PASSWORD", "").strip()
-MEDIFLOW_POSTGRES_PORT = get_setting("MEDIFLOW_POSTGRES_PORT", "5432")
+# ── RAG / Embedding Configuration ────────────────────────────────────────────
+# MediFlow v1 uses local HuggingFace embeddings (no Ollama server required).
+RAG_EMBEDDING_PROVIDER = get_setting("RAG_EMBEDDING_PROVIDER", "huggingface").lower()
+MEDIFLOW_EMBEDDING_MODEL = get_setting("MEDIFLOW_EMBEDDING_MODEL", "BAAI/bge-small-en")
 
-# Validate configuration presence to handle complete, partial, and no config states
-required_pg = {
-    "MEDIFLOW_POSTGRES_HOST": MEDIFLOW_POSTGRES_HOST.strip(),
-    "MEDIFLOW_POSTGRES_DB": MEDIFLOW_POSTGRES_DB.strip(),
-    "MEDIFLOW_POSTGRES_USER": MEDIFLOW_POSTGRES_USER.strip(),
-    "MEDIFLOW_POSTGRES_PASSWORD": MEDIFLOW_POSTGRES_PASSWORD.strip(),
-}
+# ── Database Configuration ────────────────────────────────────────────────────
+# MediFlow v1 uses SQLite only. No PostgreSQL configuration needed.
+MEDIFLOW_DB_PATH = get_setting("MEDIFLOW_DB_PATH", str(PROJECT_ROOT / "mediflow.db"))
 
-all_pg_set = all(bool(val) for val in required_pg.values())
-any_pg_set = any(bool(val) for val in required_pg.values())
-
-if any_pg_set and not all_pg_set:
-    missing = [key for key, val in required_pg.items() if not val]
-    raise ValueError(
-        f"Incomplete PostgreSQL configuration. Missing required variables: {', '.join(missing)}"
-    )
-
-IS_POSTGRES = all_pg_set
-
-# ── LanguageTool Configuration ────────────────────────────────────────────────
-MEDIFLOW_LANGUAGETOOL_URL = get_setting("MEDIFLOW_LANGUAGETOOL_URL", "http://localhost:8010/v2/check")
-timeout_str = get_setting("MEDIFLOW_LANGUAGETOOL_TIMEOUT_SECONDS", "5.0")
-
-try:
-    MEDIFLOW_LANGUAGETOOL_TIMEOUT_SECONDS = float(timeout_str)
-except ValueError:
-    raise ValueError(
-        f"MEDIFLOW_LANGUAGETOOL_TIMEOUT_SECONDS must be a valid float, got '{timeout_str}'"
-    )
-
-if MEDIFLOW_LANGUAGETOOL_TIMEOUT_SECONDS <= 0:
-    raise ValueError(
-        f"MEDIFLOW_LANGUAGETOOL_TIMEOUT_SECONDS must be greater than zero, got {MEDIFLOW_LANGUAGETOOL_TIMEOUT_SECONDS}"
-    )
+# ── ChromaDB Configuration ────────────────────────────────────────────────────
+MEDIFLOW_CHROMA_PATH = get_setting("MEDIFLOW_CHROMA_PATH", str(PROJECT_ROOT / "db" / "chroma_data"))

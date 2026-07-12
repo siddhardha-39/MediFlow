@@ -17,16 +17,16 @@ LANGGRAPH CONCEPT — CORRECTION WORKFLOW:
     We use retry_count to prevent infinite loops.
 """
 import logging
-from langchain_ollama import ChatOllama
 from langchain_core.messages import HumanMessage
 
 from config import MEDIFLOW_LLM_MODEL
+from llm_factory import get_chat_llm
 from clinical_workflow.state import ClinicalWorkflowState
 from clinical_workflow.utils import parse_llm_json
 
 logger = logging.getLogger("workflow.node.corrector")
 
-llm = ChatOllama(model=MEDIFLOW_LLM_MODEL, temperature=0.0)
+llm = get_chat_llm(temperature=0.0)
 
 MAX_CORRECTIONS = 3  # Safety limit to prevent infinite reject→correct loops
 

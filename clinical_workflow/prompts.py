@@ -1,11 +1,6 @@
-# soap_notes/prompts.py
+# clinical_workflow/prompts.py
 """
 Prompts for SOAP note generation.
-
-DESIGN DECISIONS:
-    - Force JSON-only output (same pattern as Stage 2)
-    - Include explicit section definitions so the LLM knows what goes where
-    - Double curly braces {{ }} are Python string escapes for literal braces
 """
 
 SOAP_GENERATION_PROMPT = """You are a medical documentation assistant.
@@ -25,12 +20,12 @@ Rules:
 - Keep each section concise but complete
 
 Required JSON format:
-{{
+{
     "subjective": "...",
     "objective": "...",
     "assessment": "...",
     "plan": "..."
-}}
+}
 
 Transcript:
 {transcript_text}"""

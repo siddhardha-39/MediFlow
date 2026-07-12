@@ -16,18 +16,18 @@ LANGGRAPH CONCEPT — RETRIES VIA GRAPH EDGES:
     - The graph can be visualized showing the retry path
 """
 import logging
-from langchain_ollama import ChatOllama
 from langchain_core.messages import HumanMessage
 
 from config import MEDIFLOW_LLM_MODEL
+from llm_factory import get_chat_llm
 from clinical_workflow.state import ClinicalWorkflowState
 from clinical_workflow.utils import parse_llm_json
-from soap_notes.prompts import SOAP_GENERATION_PROMPT
+from clinical_workflow.prompts import SOAP_GENERATION_PROMPT
 
 logger = logging.getLogger("workflow.node.soap_formatter")
 
 # Same model, deterministic
-llm = ChatOllama(model=MEDIFLOW_LLM_MODEL, temperature=0.0)
+llm = get_chat_llm(temperature=0.0)
 
 
 def soap_formatter_node(state: ClinicalWorkflowState) -> dict:

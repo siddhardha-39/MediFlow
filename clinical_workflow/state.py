@@ -40,12 +40,12 @@ class ClinicalWorkflowState(TypedDict, total=False):
     """
 
     # ── Inputs (set at workflow start) ─────────────────────────────────────
-    audio_path: str          # Path to the doctor's audio recording
+    audio_path: str          # Optional path to audio file (not used in v1 text-input flow)
     patient_name: str        # Patient's name for database lookup
 
     # ── Transcription (set by transcriber node) ────────────────────────────
-    raw_transcript: str      # Raw text from Whisper
-    clean_transcript: str    # Cleaned text (filler words removed)
+    raw_transcript: str      # Raw consultation text (typed by user or loaded from file)
+    clean_transcript: str    # Cleaned text (filler words removed by cleaner node)
 
     # ── SOAP Note (set by soap_formatter node) ─────────────────────────────
     soap_subjective: str     # S — what the patient reports
@@ -59,10 +59,7 @@ class ClinicalWorkflowState(TypedDict, total=False):
     validation_warnings: list[str]       # Quality warnings
     retry_count: int                     # Number of SOAP formatting retries
 
-    # ── LanguageTool (set by validator node) ───────────────────────────────
-    languagetool_warnings: list[dict]    # List of structured grammar/style warnings
-    languagetool_status: dict            # LanguageTool check success/error metadata
-    languagetool_checked_sections: dict[str, str]  # Cache maps section -> checked text content
+
 
 
     # ── Medical Entities (set by entity extractor in soap_formatter) ───────

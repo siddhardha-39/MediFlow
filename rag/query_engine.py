@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from langchain_ollama import OllamaLLM
-
 from config import MEDIFLOW_LLM_MODEL
+from llm_factory import get_chat_llm
 from .utils import get_logger
 
 logger = get_logger("rag.query_engine")
@@ -12,12 +11,13 @@ class RAGQueryEngine:
     """Strict grounded answer generation over retrieved clinical context."""
 
     def __init__(self, model_name: str = MEDIFLOW_LLM_MODEL, temperature: float = 0.0):
-        self.llm = OllamaLLM(model=model_name, temperature=temperature)
+        self.llm = get_chat_llm(model_name=model_name, temperature=temperature)
 
     def _invoke_or_default(self, prompt: str, default: str) -> str:
         try:
-            response = self.llm.invoke(prompt)
-            text = str(response).strip()
+            from langchain_core.messages import HumanMessage
+            response = self.llm.invoke([HumanMessage(content=prompt)])
+            text = (response.content if hasattr(response, "content") else str(response)).strip()
             return text or default
         except Exception as exc:
             logger.error("RAG generation failed: %s", exc)

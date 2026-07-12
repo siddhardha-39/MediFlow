@@ -10,10 +10,10 @@ Responsibilities:
 NOTE: This module intentionally does NOT parse or validate.
       That is handled downstream by parser.py → validator.py → retry_handler.py.
 """
-from langchain_ollama import ChatOllama
 from langchain_core.messages import HumanMessage
 
 from config import MEDIFLOW_LLM_MODEL
+from llm_factory import get_chat_llm
 from structured_outputs.prompts import EXTRACTION_PROMPT, RETRY_PROMPT
 from structured_outputs.utils import get_logger, truncate
 
@@ -23,7 +23,7 @@ logger = get_logger("extractor")
 MODEL_NAME  = MEDIFLOW_LLM_MODEL
 TEMPERATURE = 0.0        # deterministic — essential for structured extraction
 
-llm = ChatOllama(model=MODEL_NAME, temperature=TEMPERATURE)
+llm = get_chat_llm(model_name=MODEL_NAME, temperature=TEMPERATURE)
 
 
 # ── Public API ─────────────────────────────────────────────────────────────────

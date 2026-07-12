@@ -27,14 +27,14 @@ class TestLocalDemoConfig(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(MEDIFLOW_API_URL, os.getenv("MEDIFLOW_API_URL", "http://localhost:8000"))
 
     async def test_dashboard_qa_falls_back_when_llm_offline(self):
-        original_llm = agents_router.ChatOllama
-        agents_router.ChatOllama = FailingLLM
+        original_llm = agents_router.get_chat_llm
+        agents_router.get_chat_llm = FailingLLM
         try:
             response = await agents_router.ask_dashboard(
                 agents_router.AskRequest(query="How many patients are in the database?")
             )
         finally:
-            agents_router.ChatOllama = original_llm
+            agents_router.get_chat_llm = original_llm
 
         self.assertIn("answer", response)
         self.assertIn("Local LLM service is offline", response["answer"])

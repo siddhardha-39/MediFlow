@@ -6,7 +6,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_ollama import ChatOllama
+from llm_factory import get_chat_llm
 from langchain_core.output_parsers import StrOutputParser
 
 from config import MEDIFLOW_LLM_MODEL
@@ -53,7 +53,7 @@ def generate_patient_briefing(
     temperature: float = 0.0,
 ) -> str:
     # LLM
-    llm = ChatOllama(model=model_name, temperature=temperature)
+    llm = get_chat_llm(model_name=model_name, temperature=temperature)
     
     prompt = ChatPromptTemplate.from_messages([
         ("system", "You are a clinical assistant. Always follow the exact format given. Never add extra commentary."),

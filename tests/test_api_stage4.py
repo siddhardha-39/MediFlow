@@ -43,7 +43,7 @@ class TestAPIStage4(unittest.TestCase):
         """Verify that the FastAPI server starts up and responds to health checks."""
         response = self.client.get("/health")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"status": "healthy", "version": "0.4.0"})
+        self.assertEqual(response.json(), {"status": "healthy", "version": "1.0.0"})
 
     def test_patient_briefing_api(self):
         """Verify the Patient History Summarizer briefing GET endpoint."""
