@@ -156,3 +156,24 @@ The current tracked suite contains 13 non-integration tests.
 ## Disclaimer
 
 Educational use only.
+## Screenshots
+
+### Patient History Briefing
+<img width="1910" height="2988" alt="screencapture-localhost-8501-2026-07-12-23_27_31" src="https://github.com/user-attachments/assets/85901efc-8186-491c-ba8f-d98675a5aa08" />
+
+
+### Clinical Documentation Workflow
+
+<img width="1910" height="1941" alt="screencapture-localhost-8501-2026-07-12-23_27_53" src="https://github.com/user-attachments/assets/71a65ae9-5261-42a7-bca2-20584a0b050c" />
+
+
+
+### Hospital Intelligence Dashboard
+
+<img width="1910" height="2203" alt="screencapture-localhost-8501-2026-07-12-23_26_59" src="https://github.com/user-attachments/assets/b257428c-20f9-42c9-80f6-ec8bb9746e45" />
+
+## Demo Video
+
+[![Watch the MediFlow Demo](https://img.youtube.com/vi/J217bn5DEps/maxresdefault.jpg)](https://youtu.be/J217bn5DEps)
+
+**Click the image above to watch the full MediFlow demo.**
