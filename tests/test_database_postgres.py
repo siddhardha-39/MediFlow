@@ -11,10 +11,12 @@ from unittest.mock import patch, MagicMock
 # Ensure project root is in path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import pytest
 import config
 import database.db as db
 
 
+@pytest.mark.unit
 class TestDatabasePostgres(unittest.TestCase):
     """Database compatibility and selection test suite."""
 

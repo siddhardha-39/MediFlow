@@ -50,12 +50,20 @@ MODEL_SIZE = "base"
 COMPUTE_TYPE = "int8"  # quantized — uses less RAM than float32
 
 # ── Model Loading ──────────────────────────────────────────────────────────────
-# We load the model ONCE at module level (not per request).
-# WHY: Model loading takes 2-5 seconds. Loading once and reusing
-#      across requests is standard practice for ML serving.
-logger.info("Loading Whisper model: %s (compute: %s)...", MODEL_SIZE, COMPUTE_TYPE)
-model = WhisperModel(MODEL_SIZE, device="cpu", compute_type=COMPUTE_TYPE)
-logger.info("Whisper model loaded successfully.")
+model = None
+
+
+def get_model():
+    """
+    Get or load the Whisper model lazily.
+    This prevents loading the model during module imports (such as test collection).
+    """
+    global model
+    if model is None:
+        logger.info("Loading Whisper model: %s (compute: %s)...", MODEL_SIZE, COMPUTE_TYPE)
+        model = WhisperModel(MODEL_SIZE, device="cpu", compute_type=COMPUTE_TYPE)
+        logger.info("Whisper model loaded successfully.")
+    return model
 
 
 # ── Public API ─────────────────────────────────────────────────────────────────
@@ -84,7 +92,8 @@ def transcribe(audio_path: str) -> TranscriptionResult:
     # model.transcribe() returns a generator of segments + metadata
     # beam_size=5: explores 5 hypotheses per step (default, good balance)
     # vad_filter=True: skips silence — faster processing, cleaner output
-    segments_gen, info = model.transcribe(
+    whisper_model = get_model()
+    segments_gen, info = whisper_model.transcribe(
         audio_path,
         beam_size=5,
         vad_filter=True,

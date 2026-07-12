@@ -2,6 +2,8 @@ import os
 import sys
 import unittest
 
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import MEDIFLOW_API_URL, MEDIFLOW_EMBEDDING_MODEL, MEDIFLOW_LLM_MODEL, RAG_EMBEDDING_PROVIDER
@@ -16,6 +18,7 @@ class FailingLLM:
         raise ConnectionError("Ollama offline")
 
 
+@pytest.mark.unit
 class TestLocalDemoConfig(unittest.IsolatedAsyncioTestCase):
     def test_default_local_demo_settings(self):
         self.assertEqual(MEDIFLOW_LLM_MODEL, os.getenv("MEDIFLOW_LLM_MODEL", "llama3.2:1b"))

@@ -66,7 +66,7 @@ def create_test_audio(filepath: str, duration_secs: float = 3.0, freq: float = 4
     print(f"[OK] Test audio created: {filepath} ({duration_secs}s)")
 
 
-def test_health():
+def check_health():
     """Test that the server is running."""
     try:
         resp = requests.get(f"{API_URL}/health", timeout=5)
@@ -77,7 +77,7 @@ def test_health():
         return False
 
 
-def test_transcription(audio_path: str):
+def run_transcription(audio_path: str):
     """Upload an audio file and print the transcription result."""
     print(f"\n--- Uploading: {os.path.basename(audio_path)} ---")
 
@@ -108,7 +108,7 @@ def main():
     print("=" * 60)
 
     # Step 1: Health check
-    if not test_health():
+    if not check_health():
         return
 
     # Step 2: Create test audio (if no real audio file provided)
@@ -122,7 +122,7 @@ def main():
         create_test_audio(audio_path)
 
     # Step 3: Test transcription
-    test_transcription(audio_path)
+    run_transcription(audio_path)
 
     print("\n" + "=" * 60)
     print("  Test complete.")

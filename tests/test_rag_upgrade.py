@@ -2,6 +2,7 @@ import os
 import sys
 import tempfile
 import unittest
+import pytest
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -23,6 +24,7 @@ class FakeVectorDB:
         return self.results[:k]
 
 
+@pytest.mark.unit
 class TestRAGUpgrade(unittest.TestCase):
     def test_clinical_metadata_classification(self):
         medication = ClinicalMetadataTagger.generate_metadata(

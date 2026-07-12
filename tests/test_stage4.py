@@ -10,6 +10,10 @@ flow automatically. Instead we test:
 """
 import sys
 import os
+import pytest
+
+pytestmark = pytest.mark.unit
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import logging
@@ -30,7 +34,7 @@ SAMPLE_TRANSCRIPT = (
 )
 
 
-def test_section(name):
+def print_section(name):
     print(f"\n{'='*60}")
     print(f"  {name}")
     print(f"{'='*60}")
@@ -38,7 +42,7 @@ def test_section(name):
 
 def test_cleaner():
     """Test the cleaner node independently."""
-    test_section("TEST 1: Cleaner Node")
+    print_section("TEST 1: Cleaner Node")
     from clinical_workflow.nodes.cleaner import cleaner_node
 
     dirty = "So um the patient like has um chest pain you know and uh shortness of breath"
@@ -55,7 +59,7 @@ def test_cleaner():
 
 def test_validator():
     """Test the validator node with complete and incomplete notes."""
-    test_section("TEST 2: Validator Node")
+    print_section("TEST 2: Validator Node")
     from clinical_workflow.nodes.validator import validator_node
 
     # Complete note
@@ -86,7 +90,7 @@ def test_validator():
 
 def test_soap_formatter():
     """Test SOAP note generation."""
-    test_section("TEST 3: SOAP Formatter Node")
+    print_section("TEST 3: SOAP Formatter Node")
     from clinical_workflow.nodes.soap_formatter import soap_formatter_node
 
     state = {"clean_transcript": SAMPLE_TRANSCRIPT, "retry_count": 0}
@@ -103,7 +107,7 @@ def test_soap_formatter():
 
 def test_graph_structure():
     """Test that the graph is built correctly."""
-    test_section("TEST 4: Graph Structure")
+    print_section("TEST 4: Graph Structure")
     from clinical_workflow.graph import clinical_workflow
 
     # The compiled graph should exist
@@ -133,7 +137,7 @@ def test_auto_workflow():
         already-bound reference. So we build a fresh graph and
         inject our auto_approve function directly.
     """
-    test_section("TEST 5: Full Workflow (auto-approve)")
+    print_section("TEST 5: Full Workflow (auto-approve)")
     from langgraph.graph import StateGraph, END
     from clinical_workflow.state import ClinicalWorkflowState
     from clinical_workflow.nodes.transcriber import transcriber_node
@@ -223,7 +227,7 @@ def main():
     test_graph_structure()
     test_auto_workflow()
 
-    test_section("SUMMARY")
+    print_section("SUMMARY")
     print("  Test 1 (Cleaner):        [OK]")
     print("  Test 2 (Validator):      [OK]")
     print("  Test 3 (SOAP Formatter): [OK]")

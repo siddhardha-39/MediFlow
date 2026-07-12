@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 # Ensure project root is in path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import pytest
 from app import app
 from database.db import init_db, get_patient_by_name
 
@@ -28,6 +29,7 @@ SAMPLE_TEXT = (
 )
 
 
+@pytest.mark.unit
 class TestAPIStage4(unittest.TestCase):
     """API Integration Test Case for Stage 4."""
 
