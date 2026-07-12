@@ -52,5 +52,18 @@ if any_pg_set and not all_pg_set:
 
 IS_POSTGRES = all_pg_set
 
+# ── LanguageTool Configuration ────────────────────────────────────────────────
+MEDIFLOW_LANGUAGETOOL_URL = get_setting("MEDIFLOW_LANGUAGETOOL_URL", "http://localhost:8010/v2/check")
+timeout_str = get_setting("MEDIFLOW_LANGUAGETOOL_TIMEOUT_SECONDS", "5.0")
 
+try:
+    MEDIFLOW_LANGUAGETOOL_TIMEOUT_SECONDS = float(timeout_str)
+except ValueError:
+    raise ValueError(
+        f"MEDIFLOW_LANGUAGETOOL_TIMEOUT_SECONDS must be a valid float, got '{timeout_str}'"
+    )
 
+if MEDIFLOW_LANGUAGETOOL_TIMEOUT_SECONDS <= 0:
+    raise ValueError(
+        f"MEDIFLOW_LANGUAGETOOL_TIMEOUT_SECONDS must be greater than zero, got {MEDIFLOW_LANGUAGETOOL_TIMEOUT_SECONDS}"
+    )

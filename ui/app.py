@@ -1,6 +1,5 @@
 import streamlit as st
 import httpx
-import pandas as pd
 import json
 import sys
 from pathlib import Path
@@ -19,73 +18,270 @@ API_URL = MEDIFLOW_API_URL
 # ── Custom CSS Styling ────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-    /* Gradient premium dark theme */
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@200;300;400;500;600;700&display=swap');
+
+    :root {
+        --space-black: #030303;
+        --glass-bg: rgba(8, 8, 12, 0.65);
+        --glass-bg-strong: rgba(4, 4, 6, 0.8);
+        --glass-border: rgba(255, 255, 255, 0.08);
+        --glass-border-strong: rgba(255, 255, 255, 0.25);
+        --accent: #38bdf8; /* HUD cyan */
+        --accent-glow: rgba(56, 189, 248, 0.25);
+        --text-main: #f3f4f6;
+        --text-muted: #9ca3af;
+        --shadow: 0 30px 60px rgba(0, 0, 0, 0.8);
+    }
+
+    /* Global typography */
+    .stApp, .stMarkdown, .stButton, .stTextInput, .stTextArea, .stSelectbox, .stRadio, .stCheckbox, .stExpander, .stAlert, .stDataFrame, .stTable {
+        font-family: 'Space Grotesk', 'Inter', sans-serif !important;
+        letter-spacing: -0.015em;
+    }
+
     .stApp {
-        background: linear-gradient(135deg, #0b0f19 0%, #111827 50%, #1e1b4b 100%);
-        color: #f1f5f9;
+        background:
+            radial-gradient(circle at 80% 20%, rgba(56, 189, 248, 0.1), transparent 45%),
+            radial-gradient(circle at 15% 80%, rgba(129, 140, 248, 0.08), transparent 45%),
+            linear-gradient(180deg, #030303 0%, #07080d 50%, #020204 100%) !important;
+        color: var(--text-main);
     }
+
+    /* Technical grid overlay */
+    .stApp::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+            linear-gradient(rgba(255, 255, 255, 0.008) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.008) 1px, transparent 1px);
+        background-size: 50px 50px;
+        mask-image: radial-gradient(circle at 50% 50%, black 60%, rgba(0, 0, 0, 0.2));
+        opacity: 0.95;
+        z-index: 0;
+    }
+
+    .block-container {
+        padding-top: 3rem;
+        padding-bottom: 3rem;
+        max-width: 90rem !important;
+    }
+
+    /* SpaceX-style headers */
     .main-title {
-        font-family: 'Outfit', 'Inter', sans-serif;
-        background: linear-gradient(90deg, #38bdf8 0%, #6366f1 50%, #a855f7 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        font-size: 42px;
-        font-weight: 800;
-        margin-bottom: 2px;
-    }
-    .sub-title {
-        color: #94a3b8;
-        font-size: 16px;
-        margin-bottom: 25px;
-        font-weight: 400;
-    }
-    .metric-card {
-        background-color: rgba(30, 41, 59, 0.45);
-        border: 1px solid rgba(71, 85, 105, 0.4);
-        border-radius: 12px;
-        padding: 22px 15px;
-        text-align: center;
-        backdrop-filter: blur(8px);
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
-        transition: transform 0.2s ease-in-out;
-    }
-    .metric-card:hover {
-        transform: translateY(-2px);
-        border-color: rgba(56, 189, 248, 0.5);
-    }
-    .metric-value {
-        font-size: 34px;
-        font-weight: 800;
-        color: #38bdf8;
-        margin-bottom: 2px;
-    }
-    .metric-label {
-        font-size: 13px;
-        color: #94a3b8;
+        font-family: 'Space Grotesk', sans-serif;
         text-transform: uppercase;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.15em;
+        font-weight: 700;
+        color: #ffffff !important;
+        font-size: clamp(2rem, 3.5vw, 3.5rem);
+        margin-bottom: 0.3rem;
     }
-    .briefing-container {
-        background-color: rgba(15, 23, 42, 0.7);
-        border: 1px solid rgba(51, 65, 85, 0.5);
-        border-radius: 12px;
-        padding: 25px;
-        font-family: 'Courier New', Courier, monospace;
-        color: #cbd5e1;
-        white-space: pre-wrap;
-        line-height: 1.6;
-        box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5);
-        font-size: 14px;
-    }
-    /* Highlight allergies & critical text */
-    .critical-banner {
-        background-color: rgba(239, 68, 68, 0.15);
-        border-left: 5px solid #ef4444;
-        padding: 12px 16px;
-        border-radius: 4px;
-        margin-bottom: 15px;
-        color: #fca5a5;
+
+    .sub-title {
+        font-family: 'Inter', sans-serif;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.2em;
+        font-size: 0.75rem;
         font-weight: 500;
+        margin-bottom: 2rem;
+    }
+
+    /* SpaceX Outline Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0.5rem !important;
+        background: transparent !important;
+        border-bottom: 1px solid var(--glass-border) !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+        backdrop-filter: none !important;
+        box-shadow: none !important;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 0 !important;
+        padding: 1rem 1.5rem !important;
+        color: var(--text-muted) !important;
+        background: transparent !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.1em !important;
+        font-size: 0.8rem !important;
+        font-weight: 600 !important;
+        border-bottom: 2px solid transparent !important;
+        transition: all 0.25s ease !important;
+    }
+
+    .stTabs [data-baseweb="tab"]:hover {
+        color: #ffffff !important;
+    }
+
+    .stTabs [aria-selected="true"] {
+        color: #ffffff !important;
+        background: transparent !important;
+        border-bottom: 2px solid #ffffff !important;
+        box-shadow: none !important;
+    }
+
+    /* SpaceX-style minimalist buttons */
+    .stButton > button {
+        border-radius: 0px !important;
+        border: 1px solid #ffffff !important;
+        background: transparent !important;
+        color: #ffffff !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.15em !important;
+        font-size: 0.75rem !important;
+        font-weight: 600 !important;
+        padding: 0.75rem 1.5rem !important;
+        transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1) !important;
+        box-shadow: none !important;
+    }
+
+    .stButton > button:hover {
+        transform: none !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        box-shadow: 0 10px 30px rgba(255, 255, 255, 0.15) !important;
+    }
+
+    .stButton > button[data-testid="baseButton-primary"] {
+        background: #ffffff !important;
+        border-color: #ffffff !important;
+        color: #000000 !important;
+    }
+
+    .stButton > button[data-testid="baseButton-primary"]:hover {
+        background: transparent !important;
+        color: #ffffff !important;
+        box-shadow: 0 10px 30px rgba(255, 255, 255, 0.1) !important;
+    }
+
+    /* Glass Panels & Metric Cards with HUD Styling */
+    .metric-card, .glass-panel, .stExpander, .stAlert, [data-testid="stForm"], section[data-testid="stSidebar"] {
+        background: var(--glass-bg) !important;
+        border: 1px solid var(--glass-border) !important;
+        border-radius: 0px !important; /* Minimalist angular borders */
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+        box-shadow: var(--shadow) !important;
+        transition: all 0.35s cubic-bezier(0.25, 1, 0.5, 1) !important;
+    }
+
+    .metric-card {
+        padding: 1.5rem !important;
+        text-align: left !important;
+        position: relative;
+        overflow: hidden;
+    }
+
+    /* HUD style corner markers for metrics */
+    .metric-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 10px;
+        height: 10px;
+        border-top: 2px solid var(--accent);
+        border-left: 2px solid var(--accent);
+    }
+
+    .metric-card:hover {
+        transform: translateY(-2px) !important;
+        border-color: var(--glass-border-strong) !important;
+        box-shadow: 0 20px 45px rgba(0, 0, 0, 0.9), 0 0 15px rgba(56, 189, 248, 0.1) !important;
+    }
+
+    .metric-value {
+        font-family: 'Space Grotesk', sans-serif !important;
+        font-size: 2.5rem;
+        font-weight: 300;
+        color: #ffffff;
+        margin-bottom: 0.1rem;
+    }
+
+    .metric-label {
+        font-family: 'Inter', sans-serif !important;
+        font-size: 0.65rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.2em;
+    }
+
+    /* Briefing HUD Container */
+    .briefing-container {
+        background: rgba(4, 4, 6, 0.85) !important;
+        border: 1px solid rgba(255, 255, 255, 0.05) !important;
+        border-radius: 0px !important;
+        padding: 1.5rem !important;
+        font-family: 'Space Grotesk', Courier, monospace !important;
+        color: #ffffff !important;
+        white-space: pre-wrap !important;
+        line-height: 1.8 !important;
+        box-shadow: var(--shadow) !important;
+        font-size: 0.9rem !important;
+        border-left: 3px solid var(--accent) !important;
+    }
+
+    .critical-banner {
+        background: rgba(239, 68, 68, 0.08) !important;
+        border: 1px solid rgba(239, 68, 68, 0.25) !important;
+        border-left: 4px solid #ef4444 !important;
+        padding: 1rem !important;
+        border-radius: 0px !important;
+        margin-bottom: 1.5rem !important;
+        color: #fca5a5 !important;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    /* Sleek inputs */
+    .stTextInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] > div {
+        background: rgba(0, 0, 0, 0.4) !important;
+        color: #ffffff !important;
+        border-radius: 0px !important;
+        border: 1px solid var(--glass-border) !important;
+        backdrop-filter: blur(10px) !important;
+        transition: all 0.25s ease !important;
+    }
+
+    .stTextInput input:focus, .stTextArea textarea:focus, .stSelectbox div[data-baseweb="select"] > div:focus {
+        border-color: #ffffff !important;
+        background: rgba(0, 0, 0, 0.6) !important;
+        box-shadow: 0 0 10px rgba(255, 255, 255, 0.1) !important;
+        outline: none !important;
+    }
+
+    [data-testid="stFileUploaderDropzone"] {
+        background: rgba(0, 0, 0, 0.3) !important;
+        border: 1px dashed var(--glass-border) !important;
+        border-radius: 0px !important;
+        padding: 2.5rem !important;
+    }
+    [data-testid="stFileUploaderDropzone"]:hover {
+        border-color: #ffffff !important;
+        background: rgba(255, 255, 255, 0.03) !important;
+    }
+
+    .stAlert {
+        border: 1px solid var(--glass-border) !important;
+        border-radius: 0px !important;
+        background: rgba(8, 8, 12, 0.5) !important;
+    }
+
+    .stExpander details {
+        background: rgba(0, 0, 0, 0.2) !important;
+        border: 1px solid var(--glass-border) !important;
+        border-radius: 0px !important;
+    }
+
+    .stDataFrame, .stPlotlyChart, .stBarChart {
+        border-radius: 0px !important;
+        border: 1px solid var(--glass-border) !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -411,6 +607,42 @@ with tab_clinical:
             else:
                 st.success("SOAP note conforms to clinical completeness guidelines.")
                 
+            # ── LanguageTool Suggestions ──────────────────────────────────────
+            st.markdown("### Language & Grammar Suggestions")
+            lt_status = state.get("languagetool_status", {})
+            lt_warnings = state.get("languagetool_warnings", [])
+
+            if not lt_status:
+                st.info("Grammar check has not been run for this session.")
+            elif not lt_status.get("success", False):
+                err_type = lt_status.get("error_type", "unknown")
+                st.warning(f"⚠️ LanguageTool service is offline or unreachable ({err_type}). Grammar and style check skipped.")
+            else:
+                if not lt_warnings:
+                    st.info("No grammar or style issues detected.")
+                else:
+                    # Group by SOAP section
+                    grouped_warnings = {}
+                    for w in lt_warnings:
+                        sec = w.get("section", "General")
+                        if sec not in grouped_warnings:
+                            grouped_warnings[sec] = []
+                        grouped_warnings[sec].append(w)
+
+                    for sec, warnings_in_sec in grouped_warnings.items():
+                        with st.expander(f"📌 {sec} Section ({len(warnings_in_sec)} suggestions)", expanded=True):
+                            for idx, w in enumerate(warnings_in_sec):
+                                matched = w.get("matched_text", "")
+                                message = w.get("message", "")
+                                reps = w.get("replacements", [])
+
+                                st.markdown(f"**Suggestion {idx + 1}**: {message}")
+                                if matched:
+                                    st.markdown(f"- *Matched text*: `{matched}`")
+                                if reps:
+                                    st.markdown(f"- *Suggested replacements*: {', '.join([f'`{r}`' for r in reps[:5]])}")
+                                st.write("")
+
             # Extracted Medical Entities
             st.markdown("### Extracted Entities")
             st.write("**Known Allergies:**")
@@ -571,16 +803,14 @@ with tab_dash:
             med_data = stats.get("top_medications", [])
             
             if cond_data:
-                df_cond = pd.DataFrame(cond_data)
                 st.write("**Top Diagnosed Conditions Count**")
-                st.bar_chart(data=df_cond, x="name", y="count", color="#38bdf8")
+                st.bar_chart(data=cond_data, x="name", y="count", color="#38bdf8")
             else:
                 st.info("No condition trends to display yet.")
                 
             if med_data:
-                df_med = pd.DataFrame(med_data)
                 st.write("**Top Prescribed Medications Count**")
-                st.bar_chart(data=df_med, x="name", y="count", color="#6366f1")
+                st.bar_chart(data=med_data, x="name", y="count", color="#6366f1")
             else:
                 st.info("No prescription trends to display yet.")
 

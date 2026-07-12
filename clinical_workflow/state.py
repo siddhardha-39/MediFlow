@@ -59,6 +59,12 @@ class ClinicalWorkflowState(TypedDict, total=False):
     validation_warnings: list[str]       # Quality warnings
     retry_count: int                     # Number of SOAP formatting retries
 
+    # ── LanguageTool (set by validator node) ───────────────────────────────
+    languagetool_warnings: list[dict]    # List of structured grammar/style warnings
+    languagetool_status: dict            # LanguageTool check success/error metadata
+    languagetool_checked_sections: dict[str, str]  # Cache maps section -> checked text content
+
+
     # ── Medical Entities (set by entity extractor in soap_formatter) ───────
     conditions: list[str]
     medications: list[str]
