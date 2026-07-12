@@ -1,209 +1,158 @@
-# MediFlow: AI-Powered Clinical Intelligence Platform
+# MediFlow
 
-An educational software engineering and applied AI project demonstrating stateful medical note-taking workflows, offline local LLM integration, and clinical data persistence.
+An educational Agentic AI project demonstrating LangChain, LangGraph, RAG, human-in-the-loop workflows, and AI-assisted clinical documentation.
 
 > [!WARNING]
-> **Disclaimer**: MediFlow is an educational software engineering and applied AI project. It is not intended for clinical diagnosis, treatment decisions, or production healthcare use. It has not undergone clinical validation, HIPAA security audits, or medical regulatory reviews.
+> Educational use only. MediFlow is not intended for diagnosis, treatment, or production healthcare use.
 
----
+## Project Motivation
 
-## The Problem
-Physicians spend up to 40% of their workday on clinical documentation and paperwork, contributing to record-high burnout rates. Meanwhile, care coordination suffers due to fragmented patient history records and manual operational tracking. 
+Clinical documentation is repetitive, and patient context is often scattered across PDFs and prior notes. MediFlow shows how a small, student-level agentic system can brief on prior patient history, draft structured SOAP notes, and preserve a reviewable workflow around that output.
 
-MediFlow solves this by providing:
-1. **Contextual History Briefing**: Aggregating patient background data using Retrieval-Augmented Generation (RAG).
-2. **Stateful Documentation Workflow**: Generating validated, formatted SOAP notes using local LLMs.
-3. **Operational Telemetry**: Aggregating conditions and medications in a central operational dashboard.
+## What MediFlow Does
 
----
+MediFlow has three main experiences:
 
-## Core Modules
+1. Patient History Briefing: ingests synthetic patient PDFs, chunks them, embeds them locally, stores them in ChromaDB, and generates a grounded Gemini briefing for the selected patient.
+2. Clinical Documentation Workflow: accepts a typed consultation transcript, cleans it, drafts SOAP sections, validates them, pauses for human review, and routes corrections back through LangGraph.
+3. Hospital Intelligence Dashboard: reads persisted SQLite data and shows summary statistics plus a simple natural-language Q&A panel.
 
-### 1. Patient History Summarizer
-* Ingests medical PDF records and parses clinical text.
-* Generates vector embeddings stored in a local **ChromaDB** index.
-* Executes semantic searches with metadata filters (medications, allergies, chronic conditions) to provide structured histories before consultation.
+## Demo Flow
 
-### 2. Clinical Documentation Workflow
-* Cleans transcript transcripts by stripping filler text ("um", "uh", "like").
-* Auto-formats transcripts into standard **SOAP** note sections (Subjective, Objective, Assessment, Plan).
-* Validates notes for completeness and validates spelling/grammar against a local **LanguageTool** instance.
-* Pauses for human-in-the-loop validation (doctor approval) and loops back for corrections if rejected.
+The local demo starts FastAPI and Streamlit, accepts a Gemini API key at runtime in the UI, and lets you move through patient briefing, SOAP generation, rejection/correction, approval, and dashboard review without requiring real Gemini calls in tests.
 
-### 3. Hospital Intelligence Dashboard
-* Summarizes telemetry analytics, including patient counts, total sessions, and aggregate conditions/medications.
-* Provides a natural language interface to query operational statistics.
-
----
-
-## System Architecture
+## Agentic Workflow
 
 ```mermaid
 graph TD
-    Streamlit[Streamlit UI ui/app.py]
-    FastAPI[FastAPI Server app.py]
-    
-    subgraph LangGraph ["Stateful LangGraph Workflow (clinical_workflow/)"]
-        Transcriber[Transcriber Node]
-        Cleaner[Cleaner Node]
-        Formatter[SOAP Formatter Node]
-        Validator[Validator Node]
-        Approval[Approval Pause Node]
-        Corrector[Corrector Node]
-        Saver[Saver Node]
-    end
-    
-    Ollama[Ollama Local LLM]
-    Chroma[ChromaDB Vector Store]
-    LT[LanguageTool Server]
-    
-    DB[database/db.py Manager]
-    Postgres[(PostgreSQL DB)]
-    SQLite[(SQLite DB)]
-    
-    Streamlit -- HTTP REST --> FastAPI
-    FastAPI -- Invokes --> LangGraph
-    
-    Transcriber --> Cleaner --> Formatter --> Validator
-    Validator -- "is_valid = True" --> Approval
-    Validator -- "is_valid = False (Retry < 3)" --> Formatter
-    Approval -- "Approved" --> Saver
-    Approval -- "Rejected / Corrections" --> Corrector --> Validator
-    
-    Formatter -- "RAG context" --> Chroma
-    Formatter -- "Extract & Format" --> Ollama
-    Validator -- "Spelling & Grammar" --> LT
-    Saver -- "Persist Record" --> DB
-    
-    DB -- "Default / Complete Config" --> Postgres
-    DB -- "Fallback / No Config" --> SQLite
+    Input[Transcript Input]
+    Cleaner[Cleaner Node]
+    Formatter[SOAP Formatter Node]
+    Validator[Validator Node]
+    Retry[Conditional Retry]
+    Review[Human Review Interrupt]
+    Corrector[Corrector Node]
+    Saver[Saver Node]
+
+    Input --> Cleaner --> Formatter --> Validator
+    Validator -->|invalid| Retry --> Formatter
+    Validator -->|valid| Review
+    Review -->|approve| Saver
+    Review -->|reject| Corrector --> Validator
 ```
 
----
+LangGraph is used because it makes the workflow stateful and inspectable. Nodes produce state updates, conditional edges control retry routing, and the approval interrupt lets the reviewer decide when the record is good enough to save.
 
-## Key Engineering Decisions
+## RAG Flow
 
-* **Local-First Privacy**: Uses offline Ollama LLMs and ChromaDB to protect patient confidentiality and avoid third-party API exposure.
-* **PostgreSQL with SQLite Fallback**: Supports enterprise-ready PostgreSQL persistence, but defaults to zero-config SQLite if PostgreSQL environment variables are omitted, enabling instant local runs.
-* **Graceful API Degradation**: Isolates secondary LanguageTool check connections. If the LanguageTool service goes offline or times out, the workflow logs the status and completes successfully without crashing.
-* **Stateful Interrupts**: Uses LangGraph's checkpointer to pause execution at the approval node, allowing doctors to review drafts in the Streamlit UI before saving.
+```mermaid
+graph TD
+    PDF[Synthetic Patient PDF]
+    Load[Load and Chunk]
+    Embed[HuggingFace Embeddings]
+    Chroma[ChromaDB]
+    Scope[Patient-Scoped Retrieval]
+    Context[Retrieved Context]
+    Gemini[Gemini]
+    Briefing[Patient Briefing]
 
----
-
-## Repository Structure
-
-```text
-MediFlow/
-├── agents/             # Telemetry routing and dashboard query handlers
-├── clinical_workflow/  # LangGraph state schema, client nodes, and validation
-│   ├── nodes/          # Graph execution steps (cleaner, saver, validator, etc.)
-│   ├── languagetool.py # LanguageTool HTTP client and data models
-│   └── state.py        # LangGraph state schema definitions
-├── data/               # Seed scripts and sample patient PDF files for testing
-├── database/           # Relational schema setup and PostgreSQL/SQLite abstraction
-├── db/                 # ChromaDB indexing and vector query wrappers
-├── docs/               # Technical designs, interview guides, and demo scripts
-├── rag/                # Ingestion, document parsing, and retriever modules
-├── tests/              # Automated unit and integration test suite
-├── ui/                 # Streamlit frontend application files
-├── app.py              # FastAPI server entry point
-├── config.py           # Configuration loading and variable validation
-├── docker-compose.yml  # Local developer Docker orchestration setup
-└── requirements.txt    # Python package dependencies list
+    PDF --> Load --> Embed --> Chroma --> Scope --> Context --> Gemini --> Briefing
 ```
 
----
+The first HuggingFace model download happens on first use. After that, retrieval and briefing run locally aside from the Gemini request.
 
-## Environment Variables
+## Key Features
 
-Copy `.env.example` to `.env` to customize settings:
+- Patient history RAG over synthetic PDFs.
+- PDF ingestion, chunking, and metadata tagging.
+- Local HuggingFace embeddings.
+- ChromaDB retrieval with patient scoping.
+- Gemini-based patient briefings.
+- LangGraph workflow with conditional retry, interrupt, and resume.
+- Human review, correction, and SQLite persistence.
+- Hospital dashboard with persisted counts and trends.
+- Runtime Gemini API-key entry in Streamlit.
 
-| Variable | Description | Default |
-| :--- | :--- | :--- |
-| `MEDIFLOW_POSTGRES_HOST` | PostgreSQL Host Address | `localhost` |
-| `MEDIFLOW_POSTGRES_DB` | PostgreSQL Database Name | `mediflow` |
-| `MEDIFLOW_POSTGRES_USER` | PostgreSQL Username | `mediflow_user` |
-| `MEDIFLOW_POSTGRES_PASSWORD`| PostgreSQL Password | `mediflow_password` |
-| `MEDIFLOW_POSTGRES_HOST_PORT`| PostgreSQL Host Port (Docker) | `5432` |
-| `MEDIFLOW_LANGUAGETOOL_URL` | LanguageTool Endpoint | `http://localhost:8010/v2/check` |
-| `MEDIFLOW_LANGUAGETOOL_TIMEOUT_SECONDS` | LanguageTool Timeout | `5.0` |
-| `MEDIFLOW_LLM_MODEL` | Ollama model for SOAP formatting | `llama3.2:1b` |
-| `MEDIFLOW_EMBEDDING_MODEL` | Ollama embedding model for RAG | `nomic-embed-text` |
+## Tech Stack
 
----
+- Python
+- FastAPI
+- Streamlit
+- LangGraph
+- LangChain
+- Gemini via `langchain-google-genai`
+- HuggingFace embeddings via `langchain-huggingface`
+- ChromaDB
+- SQLite
+- Pytest
 
-## Quick Start (Docker Compose)
+## Project Structure
 
-> [!NOTE]
-> **Static Validation**: The Docker Compose service configuration and Dockerfiles have been statically verified for correct ports, hostname routing, and non-root user permissions, but complete runtime composition has not yet been executed on the current host. These commands are provided as setup instructions.
+Only the main paths are listed here:
 
-Ensure Docker is running, then execute:
+- [agents](agents)
+- [clinical_workflow](clinical_workflow)
+- [data](data)
+- [database](database)
+- [rag](rag)
+- [scripts](scripts)
+- [structured_outputs](structured_outputs)
+- [tests](tests)
+- [ui](ui)
 
-```bash
-# Copy settings template
-cp .env.example .env
+## How to Run
 
-# Build and start services
-docker compose up --build -d
-```
+Tested on Python 3.13 in the repository virtual environment.
 
-Access the systems:
-* **Streamlit UI**: `http://localhost:8501`
-* **FastAPI Docs**: `http://localhost:8000/docs`
-
----
-
-## Local Development (Without Docker)
-
-### 1. Pre-requisites
-* Python 3.11+
-* Ollama installed locally
-
-### 2. Install Dependencies
-```bash
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
-### 3. Fetch Local Models
-```bash
-ollama serve
-ollama pull llama3.2:1b
-ollama pull nomic-embed-text
+Start the backend:
+
+```powershell
+.\.venv\Scripts\python app.py
 ```
 
-### 4. Run Services
-Start the FastAPI server:
-```bash
-python app.py
+Start the frontend in another terminal:
+
+```powershell
+.\.venv\Scripts\python -m streamlit run ui/app.py
 ```
 
-In another terminal, start the Streamlit UI:
-```bash
-streamlit run ui/app.py
+In the Streamlit UI, enter your Gemini API key in the runtime key field. The key is kept in session state and sent as `X-Gemini-API-Key` on each request.
+
+On first run, the embedding model may download automatically. That is expected.
+
+## Tests
+
+Run the offline suite with:
+
+```powershell
+python -m pytest -v -m "not integration"
 ```
 
----
+The current tracked suite contains 13 non-integration tests.
 
-## Running Tests
+## What I Learned
 
-Automated tests are divided into unit and integration suites. By default, running plain `pytest` excludes integration tests.
+- How LangGraph state moves through nodes and conditional edges.
+- How retry loops and interrupts model a human review workflow.
+- How to combine RAG, embeddings, and vector retrieval for patient-specific context.
+- How to separate structured output extraction from the workflow nodes.
+- How to connect a backend API, UI, and SQLite persistence without making tests depend on live external services.
 
-### Run Unit Tests (Offline / Fast)
-Unit tests mock all LLM and grammar network connections:
-```bash
-pytest -v -m unit
-```
+## Limitations
 
-### Run Integration Tests (Requires Active Docker Services)
-To run integration tests, you must explicitly opt-in by setting the integration-test flag in your environment (which targets active running containers):
-```bash
-# Set flag and run integration tests
-$env:MEDIFLOW_RUN_INTEGRATION_TESTS="1"; pytest -v -m integration
-```
+- Educational project only.
+- Synthetic data only.
+- Gemini requires an API key and internet access.
+- The embedding model may download on first use.
+- Not clinically validated.
+- Not intended for diagnosis or treatment.
 
----
+## Disclaimer
 
-## Limitations & Future Work
-* **No Database Migrations**: Programs schema dynamically on startup. Integration of Alembic is planned.
-* **No User Authentication**: Access controls are currently omitted.
-* **Local Model Quality**: Summary accuracy depends on the local model choice (e.g. `llama3.2:1b`).
+Educational use only.
