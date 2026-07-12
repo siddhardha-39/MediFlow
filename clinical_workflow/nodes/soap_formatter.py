@@ -16,6 +16,7 @@ LANGGRAPH CONCEPT — RETRIES VIA GRAPH EDGES:
     - The graph can be visualized showing the retry path
 """
 import logging
+import re
 from typing import Optional
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
@@ -26,6 +27,51 @@ from clinical_workflow.utils import parse_llm_json
 from clinical_workflow.prompts import SOAP_GENERATION_PROMPT
 
 logger = logging.getLogger("workflow.node.soap_formatter")
+
+_ENTITY_PATTERNS = {
+    "conditions": [
+        r"\bhypertension\b",
+        r"\bhigh blood pressure\b",
+        r"\bdiabetes\b",
+        r"\btype 2 diabetes\b",
+        r"\basthma\b",
+        r"\bcopd\b",
+        r"\bpneumonia\b",
+        r"\bchronic kidney disease\b",
+    ],
+    "allergies": [
+        r"\bpenicillin\b",
+        r"\baspirin\b",
+        r"\bsulfa\b",
+        r"\blatex\b",
+        r"\bnkda\b",
+        r"\ballergic to ([^.\n;,]+)",
+    ],
+    "medications": [
+        r"\bmetformin\b",
+        r"\bamlodipine\b",
+        r"\baspirin\b",
+        r"\binsulin\b",
+        r"\btylenol\b",
+        r"\blisinopril\b",
+        r"\batorvastatin\b",
+        r"\bibuprofen\b",
+        r"\btakes? ([^.\n;,]+)",
+        r"\bcurrently taking ([^.\n;,]+)",
+        r"\bon ([^.\n;,]+)\b",
+    ],
+    "symptoms": [
+        r"\bchest pain\b",
+        r"\bshortness of breath\b",
+        r"\bfever\b",
+        r"\bcough\b",
+        r"\bheadache\b",
+        r"\bnausea\b",
+        r"\bvomiting\b",
+        r"\bdizziness\b",
+        r"\bfatigue\b",
+    ],
+}
 
 
 def soap_formatter_node(state: ClinicalWorkflowState, config: RunnableConfig = None) -> dict:
@@ -88,7 +134,7 @@ def soap_formatter_node(state: ClinicalWorkflowState, config: RunnableConfig = N
         # Extract entities only on first attempt — transcript doesn't change
         # on retries, so re-extracting wastes ~8s on an extra LLM call
         if retry_count == 0:
-            result.update(_extract_entities(transcript))
+            result.update(_extract_entities(transcript, api_key=api_key))
 
         return result
 
@@ -105,19 +151,77 @@ def soap_formatter_node(state: ClinicalWorkflowState, config: RunnableConfig = N
 
 
 
-def _extract_entities(transcript: str) -> dict:
+def _extract_entities(transcript: str, api_key: Optional[str] = None) -> dict:
     """Extract medical entities using Stage 2 pipeline."""
+    local_entities = _extract_entities_local(transcript)
+    if not api_key:
+        return local_entities
+
     try:
         from structured_outputs.retry_handler import run_with_retry
         result = run_with_retry(transcript)
         if result.success and result.patient_info:
-            return {
+            merged = {
                 "conditions": result.patient_info.conditions,
                 "medications": result.patient_info.medications,
                 "allergies": result.patient_info.allergies,
                 "symptoms": result.patient_info.symptoms,
             }
+            return _merge_entities(local_entities, merged)
     except Exception as e:
         logger.warning("Entity extraction failed: %s", e)
 
-    return {"conditions": [], "medications": [], "allergies": [], "symptoms": []}
+    return local_entities
+
+
+def _extract_entities_local(transcript: str) -> dict:
+    """Extract a small set of common entities directly from the transcript."""
+    lower = transcript.lower()
+    entities = {
+        "conditions": [],
+        "medications": [],
+        "allergies": [],
+        "symptoms": [],
+    }
+
+    for field, patterns in _ENTITY_PATTERNS.items():
+        values = []
+        for pattern in patterns:
+            for match in re.finditer(pattern, lower, flags=re.IGNORECASE):
+                value = match.group(1) if match.lastindex else match.group(0)
+                cleaned = _clean_entity_candidate(value)
+                if cleaned and cleaned not in values:
+                    values.append(cleaned)
+        entities[field] = values
+
+    return entities
+
+
+def _clean_entity_candidate(value: str) -> str:
+    """Trim filler phrases, dose text, and trailing conjunctions from a candidate."""
+    cleaned = value.strip().lower()
+    cleaned = re.split(r"\b(?:and|but|with|for)\b", cleaned, maxsplit=1)[0]
+    cleaned = re.split(r"[\.,;:\n\t]", cleaned, maxsplit=1)[0]
+    cleaned = re.sub(
+        r"\b\d+(?:\.\d+)?\s*(?:mg|mcg|g|ml|units?|tablet(?:s)?|capsule(?:s)?|puff(?:s)?|times?|daily|bid|tid|qhs|q\d+h)\b.*$",
+        "",
+        cleaned,
+    )
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" -_")
+    return cleaned
+
+
+def _merge_entities(primary: dict, fallback: dict) -> dict:
+    """Merge entity lists while preserving order and removing duplicates."""
+    merged = {}
+    for field in ["conditions", "medications", "allergies", "symptoms"]:
+        seen = set()
+        combined = []
+        for source in (primary.get(field, []), fallback.get(field, [])):
+            for item in source:
+                normalized = item.strip()
+                if normalized and normalized.lower() not in seen:
+                    seen.add(normalized.lower())
+                    combined.append(normalized)
+        merged[field] = combined
+    return merged

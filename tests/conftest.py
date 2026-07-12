@@ -53,7 +53,16 @@ def mock_llm_integrations(monkeypatch):
     monkeypatch.setattr(corrector_module, "get_chat_llm", fake_get_chat_llm)
     monkeypatch.setattr(agents_router, "get_chat_llm", fake_get_chat_llm)
     monkeypatch.setattr(patient_summary_module, "generate_grounded_patient_briefing", lambda *args, **kwargs: "PATIENT BRIEFING\n================\nName: Mock Patient\nAge: Unknown | Blood Group: Unknown\n\n[CRITICAL ALERTS]\n- None found\n\n[CHRONIC CONDITIONS]\n- Unknown\n\n[CURRENT MEDICATIONS]\n- Unknown\n\n[RECENT TESTS (KEY FINDINGS ONLY)]\n- Unknown\n\n[RECENT VISITS SUMMARY]\n- Unknown\n\n[DOCTOR'S FOCUS FOR TODAY]\n- Review source records before clinical decision-making.")
-    monkeypatch.setattr(soap_formatter_module, "_extract_entities", lambda transcript: {"conditions": ["hypertension"], "medications": ["aspirin"], "allergies": ["penicillin"], "symptoms": ["chest pain"]})
+    monkeypatch.setattr(
+        soap_formatter_module,
+        "_extract_entities",
+        lambda transcript, api_key=None: {
+            "conditions": ["hypertension"],
+            "medications": ["aspirin"],
+            "allergies": ["penicillin"],
+            "symptoms": ["chest pain"],
+        },
+    )
 
 
 def pytest_collection_modifyitems(config, items):
